@@ -1,5 +1,6 @@
 import { ReminderLine } from './ReminderLine';
 import { TriageBar } from './TriageBar';
+import { DecayTimeline } from './DecayTimeline';
 import { MoveFirstZone } from './MoveFirstZone';
 import { LowStockZone } from './LowStockZone';
 import { PickupsQueue } from './PickupsQueue';
@@ -13,6 +14,10 @@ export function Dashboard() {
 
       {/* Focusing layer: what do I touch first? */}
       <TriageBar />
+
+      {/* EXPLORATION: decay as a data-viz timeline, above the bucket list so
+          both readings can be compared. */}
+      <DecayTimeline />
 
       {/* The glance: decay-forward zones above everything else.
           items-start lets each card size to its content — no dead voids. */}
