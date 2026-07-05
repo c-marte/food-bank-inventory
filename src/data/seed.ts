@@ -1,6 +1,8 @@
 import { addDays } from '../domain/dates';
 import type {
   Config,
+  Delivery,
+  DeliveryKind,
   InventoryLot,
   ISODate,
   Partner,
@@ -68,10 +70,56 @@ export const SEED_PARTNERS: Partner[] = [
   { id: 'partner-2', name: 'Hope Street Shelter' },
 ];
 
+/** Known donors — offered as one-tap chips when logging an expected delivery,
+ *  so the recurring sources (the bulk of the pounds) auto-fill. */
+export const KNOWN_DONORS: { name: string; kind: DeliveryKind }[] = [
+  { name: 'Stop & Shop', kind: 'recurring' },
+  { name: "Sal's Catering", kind: 'catering' },
+  { name: 'Riverside Bakery', kind: 'recurring' },
+  { name: 'Lincoln Elementary Drive', kind: 'drive' },
+];
+
+interface SeedDeliveryItem {
+  name: string;
+  category: InventoryLot['category'];
+  quantity: number;
+  unit: string;
+  expiry: number; // offset in days from today (the promise-time guess)
+}
+interface SeedDelivery {
+  id: string;
+  donorName: string;
+  kind: DeliveryKind;
+  when: number; // offset in days from today
+  note?: string;
+  items: SeedDeliveryItem[];
+}
+
+// prettier-ignore
+const SEED_DELIVERIES: SeedDelivery[] = [
+  {
+    id: 'del-1', donorName: "Sal's Catering", kind: 'catering', when: 0, note: 'by 3pm — event leftovers',
+    items: [
+      { name: 'Baked Ziti',       category: 'grains',  quantity: 6,  unit: 'trays',      expiry: 2 },
+      { name: 'Turkey Sandwiches',category: 'protein', quantity: 24, unit: 'sandwiches', expiry: 1 },
+      { name: 'Garden Salad',     category: 'produce', quantity: 8,  unit: 'bowls',      expiry: 1 },
+    ],
+  },
+  {
+    id: 'del-2', donorName: 'Stop & Shop', kind: 'recurring', when: 0, note: 'usual morning drop',
+    items: [
+      { name: 'Wheat Bread',      category: 'grains',  quantity: 12, unit: 'loaves',  expiry: 3 },
+      { name: 'Bananas',          category: 'produce', quantity: 15, unit: 'bunches', expiry: 4 },
+      { name: 'Whole Milk',       category: 'dairy',   quantity: 6,  unit: 'gallons', expiry: 5 },
+    ],
+  },
+];
+
 export interface SeedData {
   lots: InventoryLot[];
   partners: Partner[];
   requests: PickupRequest[];
+  deliveries: Delivery[];
   config: Config;
 }
 
@@ -110,5 +158,31 @@ export function buildSeed(today: ISODate): SeedData {
     },
   ];
 
-  return { lots, partners: SEED_PARTNERS, requests, config: DEFAULT_CONFIG };
+  // Two expected deliveries waiting at the dock: a catering surplus (short
+  // fuse — becomes today/tomorrow lots on receive) and the recurring grocery
+  // rescue. Receiving either CREATES lots and populates the clock.
+  const deliveries: Delivery[] = SEED_DELIVERIES.map((d) => ({
+    id: d.id,
+    donorName: d.donorName,
+    kind: d.kind,
+    status: 'expected',
+    expectedDate: addDays(today, d.when),
+    note: d.note,
+    items: d.items.map((it, j) => ({
+      id: `${d.id}-item-${j + 1}`,
+      name: it.name,
+      category: it.category,
+      quantity: it.quantity,
+      unit: it.unit,
+      expiryDate: addDays(today, it.expiry),
+    })),
+  }));
+
+  return {
+    lots,
+    partners: SEED_PARTNERS,
+    requests,
+    deliveries,
+    config: DEFAULT_CONFIG,
+  };
 }

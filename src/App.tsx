@@ -10,6 +10,8 @@ import { ReminderLine } from './components/ReminderLine';
 import { IntakeForm } from './components/IntakeForm';
 import { RecordPickupSheet } from './components/RecordPickupSheet';
 import { LotActionSheet } from './components/LotActionSheet';
+import { ExpectDeliverySheet } from './components/ExpectDeliverySheet';
+import { ReceiveDeliverySheet } from './components/ReceiveDeliverySheet';
 import { Sheet } from './ui/Sheet';
 
 function Shell() {
@@ -21,6 +23,8 @@ function Shell() {
   if (sheet?.kind === 'lot') lastLotId.current = sheet.lotId;
   const lastPickupLotId = useRef<string | null>(null);
   if (sheet?.kind === 'pickup') lastPickupLotId.current = sheet.lotId ?? null;
+  const lastDeliveryId = useRef<string | null>(null);
+  if (sheet?.kind === 'receive') lastDeliveryId.current = sheet.deliveryId;
 
   return (
     <div className="min-h-svh bg-zinc-50 text-zinc-950">
@@ -34,11 +38,19 @@ function Shell() {
         {view === 'inventory' && <LotList />}
       </main>
 
-      {/* The three mutations, anchored over whichever page is behind them. */}
+      {/* Mutations, anchored over whichever page is behind them. */}
+      <ExpectDeliverySheet open={sheet?.kind === 'expect'} onClose={closeSheet} />
+
+      <ReceiveDeliverySheet
+        open={sheet?.kind === 'receive'}
+        deliveryId={lastDeliveryId.current}
+        onClose={closeSheet}
+      />
+
       <Sheet
         open={sheet?.kind === 'intake'}
         onClose={closeSheet}
-        title="Log a donation"
+        title="Walk-in donation"
       >
         <IntakeForm onDone={closeSheet} />
       </Sheet>

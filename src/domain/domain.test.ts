@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import type { Config, InventoryLot, Partner, PickupRequest } from './types';
+import type {
+  Config,
+  Delivery,
+  DeliveryItem,
+  InventoryLot,
+  Partner,
+  PickupRequest,
+} from './types';
 import { addDays } from './dates';
 import { getNonExpiredQuantity, isLowStock } from './status';
 import { getExpiringZoneLots, getLowStockZone } from './dashboard';
@@ -9,6 +16,7 @@ import {
   validateRequestItems,
 } from './requests';
 import { markWaste } from './waste';
+import { categoryDefaultExpiry, receiveDelivery } from './deliveries';
 import { buildSeed } from '../data/seed';
 
 const TODAY = '2026-07-04';
@@ -240,5 +248,68 @@ describe('markWaste', () => {
     const lots = [lot({ id: 'l1', quantity: 8 })];
     markWaste('l1', 3, lots, TODAY, 'w1');
     expect(lots[0].quantity).toBe(8);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Deliveries — food in. Receive creates NEW lots (mirror of confirm's decrement).
+// ---------------------------------------------------------------------------
+describe('receiveDelivery', () => {
+  const makeDelivery = (items: DeliveryItem[]): Delivery => ({
+    id: 'd1', donorName: "Sal's Catering", kind: 'catering',
+    status: 'expected', expectedDate: TODAY, items,
+  });
+  const item = (p: Partial<DeliveryItem> & { id: string }): DeliveryItem => ({
+    name: 'Baked Ziti', category: 'grains', quantity: 6, unit: 'trays',
+    expiryDate: addDays(TODAY, 2), ...p,
+  });
+  let n = 0;
+  const makeId = () => `new-${++n}`;
+
+  it('creates one NEW lot per verified line and appends them', () => {
+    n = 0;
+    const items = [item({ id: 'i1' }), item({ id: 'i2', name: 'Sandwiches', category: 'protein', quantity: 24, unit: 'sandwiches' })];
+    const existing = [lot({ id: 'l1', quantity: 5 })];
+    const res = receiveDelivery('d1', items, [makeDelivery(items)], existing, TODAY, makeId)!;
+    expect(res.created).toBe(2);
+    expect(res.lots.length).toBe(3);
+    expect(res.lots.find((l) => l.name === 'Baked Ziti')).toMatchObject({
+      quantity: 6, unit: 'trays', category: 'grains', receivedDate: TODAY, expiryDate: addDays(TODAY, 2),
+    });
+    expect(res.delivery.status).toBe('received');
+    expect(res.reminder).toBe("Logged: 2 lots received from Sal's Catering.");
+  });
+
+  it('never merges identical-name lines — two lines, two lots', () => {
+    n = 0;
+    const items = [item({ id: 'i1', name: 'Milk', category: 'dairy' }), item({ id: 'i2', name: 'Milk', category: 'dairy', expiryDate: addDays(TODAY, 9) })];
+    const res = receiveDelivery('d1', items, [makeDelivery(items)], [], TODAY, makeId)!;
+    expect(res.lots.filter((l) => l.name === 'Milk').length).toBe(2);
+  });
+
+  it('drops tossed/empty/nameless lines', () => {
+    n = 0;
+    const items = [item({ id: 'i1' }), item({ id: 'i2', quantity: 0 }), item({ id: 'i3', name: '  ' })];
+    const res = receiveDelivery('d1', items, [makeDelivery(items)], [], TODAY, makeId)!;
+    expect(res.created).toBe(1);
+  });
+
+  it('is idempotent-guarded: receiving a received delivery is a no-op (null)', () => {
+    const items = [item({ id: 'i1' })];
+    const d: Delivery = { ...makeDelivery(items), status: 'received' };
+    expect(receiveDelivery('d1', items, [d], [], TODAY, makeId)).toBeNull();
+  });
+
+  it('does not mutate the input lots array', () => {
+    n = 0;
+    const items = [item({ id: 'i1' })];
+    const existing = [lot({ id: 'l1', quantity: 5 })];
+    receiveDelivery('d1', items, [makeDelivery(items)], existing, TODAY, makeId);
+    expect(existing.length).toBe(1);
+  });
+
+  it('category default expiry is in the future and category-sensitive', () => {
+    expect(categoryDefaultExpiry('produce', TODAY)).toBe(addDays(TODAY, 4));
+    expect(categoryDefaultExpiry('canned', TODAY)).toBe(addDays(TODAY, 365));
   });
 });

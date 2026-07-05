@@ -55,6 +55,33 @@ export interface PickupRequest {
   status: 'requested' | 'confirmed';
 }
 
+/** An incoming donation, captured as a PROMISE before it arrives (the phone
+ *  call is the manifest) and turned into real lots only when verified at the
+ *  dock. Mirror of PickupRequest: promise -> confirm. Where confirm DECREMENTS
+ *  for a pickup, receiving a delivery CREATES new lots. */
+export type DeliveryKind = 'recurring' | 'catering' | 'drive' | 'individual';
+
+export interface DeliveryItem {
+  id: string;
+  name: string;
+  category: Category;
+  quantity: number;
+  unit: string;
+  /** Best-guess at promise time (category default); VERIFIED at the dock
+   *  against the date printed on the physical item. */
+  expiryDate: ISODate;
+}
+
+export interface Delivery {
+  id: string;
+  donorName: string;
+  kind: DeliveryKind;
+  status: 'expected' | 'received';
+  expectedDate: ISODate;
+  note?: string;
+  items: DeliveryItem[];
+}
+
 /** A recorded discard: food physically pulled from the shelf and tossed.
  *  First-class, not a silent quantity edit — spoilage is the product's #1
  *  success metric, and you can't measure what you don't record. */

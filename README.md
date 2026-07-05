@@ -123,6 +123,36 @@ row, the Act-first headline — opens the same **lot action sheet**
 | "Call a partner, move it" | **Send to partner** | Opens Record pickup **prefilled** with the lot; disabled for expired (never ships) |
 | "Pull it, toss it" | **Mark as waste** | **Partial allowed** (half the bananas can be fine), clamped, records a `WasteEvent` — spoilage is the #1 success metric and unrecorded waste can't be measured (`domain/waste.ts`, pure + tested) |
 | "Count is off" | **Adjust quantity** | Correction only; no waste record |
+
+### Deliveries (food in) — promise → verify → create
+
+Real donations don't start at the dock from zero — the **phone call is the
+manifest**. Grocery rescue, catering surplus, and food-bank allocations are all
+*known before they arrive*; the one thing that genuinely can't be known until the
+dock is the **expiry date printed on the physical item**. So intake is designed
+as **"automate the transcription, keep the human at the verification."**
+
+Deliveries are the exact **mirror of Pickups**:
+
+| | Promise | Commit | Effect on lots |
+|---|---|---|---|
+| **Pickup** (out) | `requested` | Confirm | **decrements** referenced lots |
+| **Delivery** (in) | `expected` | Receive | **creates** one new lot per line |
+
+- **Expect a delivery** (`ExpectDeliverySheet`) — the 10-second call capture:
+  donor (one-tap chips for recurring sources), when, rough lines. Expiry is
+  **guessed from category** (`categoryDefaultExpiry`).
+- **Incoming** (`IncomingDeliveries`, on Home) — expected promises, time-sorted.
+- **Receive at the dock** (`ReceiveDeliverySheet`) — the one human checkpoint:
+  verify counts, **verify each best-before against the printed label** (amber
+  field), toss what's unusable, add surprises, confirm → `receiveDelivery`
+  creates a new lot per kept line (rule 1: never merged). Pure + tested.
+
+The walk-in fast form survives as the demoted exception (a ghost "Walk-in"
+button) — it's the only inflow that truly starts at zero. *Conceptual-range note:
+a weigh-only "no item entry" concept was rejected precisely because it kills the
+per-lot expiry clock — the one thing the product exists to protect.*
+
 - **Motion** (`ui/motion.ts`) — spring-first, and only on real mutations:
   the reminder springs in, zone rows reflow when a confirm drains a lot,
   triage numbers pop on change. Collapses to instant under

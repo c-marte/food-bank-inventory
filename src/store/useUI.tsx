@@ -12,7 +12,9 @@ export type SheetState =
   | null
   | { kind: 'intake' }
   | { kind: 'pickup'; lotId?: string }
-  | { kind: 'lot'; lotId: string };
+  | { kind: 'lot'; lotId: string }
+  | { kind: 'expect' }
+  | { kind: 'receive'; deliveryId: string };
 
 interface UIValue {
   view: View;
@@ -22,6 +24,8 @@ interface UIValue {
   /** Optional lotId prefills the pickup with that lot (the "send to partner" verb). */
   openPickup: (lotId?: string) => void;
   openLot: (lotId: string) => void;
+  openExpect: () => void;
+  openReceive: (deliveryId: string) => void;
   closeSheet: () => void;
   /** Inventory page filter, presettable from the triage "already expired" path. */
   expiredOnly: boolean;
@@ -48,6 +52,8 @@ export function UIProvider({ children }: { children: ReactNode }) {
     openIntake: () => setSheet({ kind: 'intake' }),
     openPickup: (lotId) => setSheet({ kind: 'pickup', lotId }),
     openLot: (lotId) => setSheet({ kind: 'lot', lotId }),
+    openExpect: () => setSheet({ kind: 'expect' }),
+    openReceive: (deliveryId) => setSheet({ kind: 'receive', deliveryId }),
     closeSheet: () => setSheet(null),
     expiredOnly,
     setExpiredOnly,

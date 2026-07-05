@@ -15,8 +15,12 @@ import { SPRING } from '../ui/motion';
  * zones use — no new state.
  */
 export function TriageBar() {
-  const { lots, requests, today, config } = useStore();
+  const { lots, requests, deliveries, today, config } = useStore();
   const { openLot, navigate, setExpiredOnly } = useUI();
+
+  const arrivingToday = deliveries.filter(
+    (d) => d.status === 'expected' && d.expectedDate <= today,
+  ).length;
 
   const goToExpired = () => {
     setExpiredOnly(true);
@@ -111,6 +115,9 @@ export function TriageBar() {
 
       {/* State-of-the-shelf strip. Counts with a destination are tappable. */}
       <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-zinc-100 pt-3">
+        {arrivingToday > 0 && (
+          <Stat n={arrivingToday} label="arriving today" tone="zinc" />
+        )}
         <Stat n={expiring.length} label="expiring soon" tone="amber" />
         {expired.length > 0 && (
           <Stat

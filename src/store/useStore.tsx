@@ -8,6 +8,8 @@ import {
 } from 'react';
 import type {
   Config,
+  Delivery,
+  DeliveryItem,
   InventoryLot,
   ISODate,
   Partner,
@@ -19,6 +21,7 @@ import { todayISO } from '../domain/dates';
 import { buildSeed } from '../data/seed';
 import { confirmRequest as domainConfirmRequest } from '../domain/requests';
 import { markWaste as domainMarkWaste } from '../domain/waste';
+import { receiveDelivery as domainReceiveDelivery } from '../domain/deliveries';
 
 // ---------------------------------------------------------------------------
 // The single client-side store. One surface, one user (the shelf-keeper), two
@@ -31,6 +34,7 @@ import { markWaste as domainMarkWaste } from '../domain/waste';
 interface StoreState {
   lots: InventoryLot[];
   requests: PickupRequest[];
+  deliveries: Delivery[];
   partners: Partner[];
   wasteEvents: WasteEvent[];
   config: Config;
@@ -44,6 +48,8 @@ type Action =
   | { type: 'ADD_REQUEST'; request: PickupRequest }
   | { type: 'CONFIRM'; requestId: string }
   | { type: 'MARK_WASTE'; lotId: string; quantity: number; eventId: string }
+  | { type: 'ADD_DELIVERY'; delivery: Delivery }
+  | { type: 'RECEIVE_DELIVERY'; deliveryId: string; items: DeliveryItem[] }
   | { type: 'DISMISS_REMINDER' }
   | { type: 'RESET' };
 
@@ -52,6 +58,7 @@ function freshState(today: ISODate): StoreState {
   return {
     lots: seed.lots,
     requests: seed.requests,
+    deliveries: seed.deliveries,
     partners: seed.partners,
     wasteEvents: [],
     config: seed.config,
@@ -120,6 +127,32 @@ function reducer(state: StoreState, action: Action): StoreState {
       };
     }
 
+    case 'ADD_DELIVERY':
+      // A promise — captured from the phone call, before the food arrives.
+      return { ...state, deliveries: [...state.deliveries, action.delivery] };
+
+    case 'RECEIVE_DELIVERY': {
+      // The dock checkpoint: verified items become NEW lots (rule 1 — never
+      // merge). Mirror of CONFIRM, but creating instead of decrementing.
+      const res = domainReceiveDelivery(
+        action.deliveryId,
+        action.items,
+        state.deliveries,
+        state.lots,
+        state.today,
+        () => crypto.randomUUID(),
+      );
+      if (!res) return state; // missing or already-received: no-op
+      return {
+        ...state,
+        lots: res.lots,
+        deliveries: state.deliveries.map((d) =>
+          d.id === res.delivery.id ? res.delivery : d,
+        ),
+        lastReminder: res.reminder,
+      };
+    }
+
     case 'DISMISS_REMINDER':
       return { ...state, lastReminder: null };
 
@@ -131,13 +164,13 @@ function reducer(state: StoreState, action: Action): StoreState {
   }
 }
 
-const STORAGE_KEY = 'food-bank-inventory:v3';
+const STORAGE_KEY = 'food-bank-inventory:v4';
 
 interface PersistShape {
   today: ISODate;
   data: Pick<
     StoreState,
-    'lots' | 'requests' | 'partners' | 'wasteEvents' | 'config'
+    'lots' | 'requests' | 'deliveries' | 'partners' | 'wasteEvents' | 'config'
   >;
 }
 
@@ -151,6 +184,7 @@ function loadInitial(today: ISODate): StoreState {
       if (saved.today === today && saved.data?.lots) {
         return {
           ...saved.data,
+          deliveries: saved.data.deliveries ?? [],
           wasteEvents: saved.data.wasteEvents ?? [],
           today,
           lastReminder: null,
@@ -169,6 +203,8 @@ interface StoreValue extends StoreState {
   createRequest: (partnerId: string, items: RequestItem[]) => PickupRequest;
   confirmRequest: (requestId: string) => void;
   markWaste: (lotId: string, quantity: number) => void;
+  addDelivery: (delivery: Omit<Delivery, 'id' | 'status'>) => void;
+  receiveDelivery: (deliveryId: string, items: DeliveryItem[]) => void;
   dismissReminder: () => void;
   reset: () => void;
 }
@@ -187,6 +223,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       data: {
         lots: state.lots,
         requests: state.requests,
+        deliveries: state.deliveries,
         partners: state.partners,
         wasteEvents: state.wasteEvents,
         config: state.config,
@@ -226,6 +263,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         quantity,
         eventId: crypto.randomUUID(),
       }),
+    addDelivery: (delivery) =>
+      dispatch({
+        type: 'ADD_DELIVERY',
+        delivery: { ...delivery, id: crypto.randomUUID(), status: 'expected' },
+      }),
+    receiveDelivery: (deliveryId, items) =>
+      dispatch({ type: 'RECEIVE_DELIVERY', deliveryId, items }),
     dismissReminder: () => dispatch({ type: 'DISMISS_REMINDER' }),
     reset: () => dispatch({ type: 'RESET' }),
   };

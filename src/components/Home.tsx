@@ -2,6 +2,7 @@ import { useStore } from '../store/useStore';
 import { useUI } from '../store/useUI';
 import { getLotStatus } from '../domain/status';
 import { TriageBar } from './TriageBar';
+import { IncomingDeliveries } from './IncomingDeliveries';
 import { DecayTimeline } from './DecayTimeline';
 import { MoveFirstZone } from './MoveFirstZone';
 import { LowStockZone } from './LowStockZone';
@@ -13,7 +14,7 @@ import { cn } from '../ui/cn';
  *  sheets launched from the action row or from any lot. */
 export function Home() {
   const { lots, requests, wasteEvents, today, config } = useStore();
-  const { navigate, openIntake, openPickup } = useUI();
+  const { navigate, openIntake, openPickup, openExpect } = useUI();
 
   const pending = requests.filter((r) => r.status === 'requested').length;
   const confirmed = requests.filter((r) => r.status === 'confirmed').length;
@@ -27,18 +28,25 @@ export function Home() {
 
   return (
     <div className="space-y-4">
-      {/* Action row — food in, food out. */}
-      <div className="flex flex-wrap gap-2">
-        <Button size="lg" onClick={openIntake}>
-          <Icon name="plus" size={16} /> Log donation
+      {/* Action row — food in (mostly announced), food out. Walk-ins are the
+          exception, so quick-add is demoted to a ghost button. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="lg" onClick={openExpect}>
+          <Icon name="inbox" size={16} /> Expect a delivery
         </Button>
         <Button size="lg" variant="outline" onClick={() => openPickup()}>
           <Icon name="arrow" size={16} /> Record pickup
+        </Button>
+        <Button size="lg" variant="ghost" onClick={openIntake}>
+          <Icon name="plus" size={16} /> Walk-in
         </Button>
       </div>
 
       {/* Focusing layer: what do I touch first? */}
       <TriageBar />
+
+      {/* Food on its way — receive it at the dock. */}
+      <IncomingDeliveries />
 
       {/* The clock, two readings: shape of the week + ordered action queue. */}
       <DecayTimeline />
