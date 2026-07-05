@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
-import type { Category, DeliveryItem, DeliveryKind } from '../domain/types';
+import type { Category, DeliveryItem, DeliveryKind, ISODate } from '../domain/types';
 import { CATEGORIES, CATEGORY_LABELS } from '../domain/types';
 import { addDays } from '../domain/dates';
 import { categoryDefaultExpiry } from '../domain/deliveries';
+import type { ParsedItem } from '../domain/parseDonation';
 import { KNOWN_DONORS } from '../data/seed';
 import { useStore } from '../store/useStore';
 import { Sheet } from '../ui/Sheet';
 import { Button, Chip, Field, Icon, Stepper, inputClass } from '../ui/primitives';
+import { CaptureBar } from './CaptureBar';
 import { cn } from '../ui/cn';
 
 /**
@@ -21,6 +23,9 @@ interface Row {
   category: Category;
   quantity: number;
   unit: string;
+  /** Optional hint from capture ("good till tomorrow"); else the dock uses the
+   *  category default. Carried through so the dock pre-fills it for verifying. */
+  expiryDate?: ISODate;
 }
 
 const WHEN_CHIPS = [
@@ -64,6 +69,21 @@ export function ExpectDeliverySheet({
     setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...p } : r)));
   }
 
+  function applyCaptured(parsed: ParsedItem[]) {
+    const captured: Row[] = parsed.map((p) => ({
+      id: crypto.randomUUID(),
+      name: p.name,
+      category: p.category,
+      quantity: p.quantity,
+      unit: p.unit,
+      expiryDate: p.expiryDate,
+    }));
+    setRows((rs) => {
+      const kept = rs.filter((r) => r.name.trim() !== '');
+      return [...kept, ...captured];
+    });
+  }
+
   function submit() {
     if (!canSubmit) return;
     const items: DeliveryItem[] = validRows.map((r) => ({
@@ -72,7 +92,7 @@ export function ExpectDeliverySheet({
       category: r.category,
       quantity: r.quantity,
       unit: r.unit.trim() || 'units',
-      expiryDate: categoryDefaultExpiry(r.category, today),
+      expiryDate: r.expiryDate ?? categoryDefaultExpiry(r.category, today),
     }));
     addDelivery({
       donorName: donorName.trim(),
@@ -87,6 +107,8 @@ export function ExpectDeliverySheet({
   return (
     <Sheet open={open} onClose={onClose} title="Expect a delivery">
       <div className="space-y-5">
+        <CaptureBar today={today} onItems={applyCaptured} />
+
         <Field label="Donor">
           <input
             value={donorName}

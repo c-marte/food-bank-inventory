@@ -148,6 +148,19 @@ Deliveries are the exact **mirror of Pickups**:
   field), toss what's unusable, add surprises, confirm → `receiveDelivery`
   creates a new lot per kept line (rule 1: never merged). Pure + tested.
 
+#### Capture layer — automate the transcription, not the verification
+
+The promise can be drafted from a **dictation** or a **photo of the manifest**
+(`CaptureBar`), because the phone call / the slip *is* the data. The
+speech-to-text and photo-OCR are **simulated** (a typewriter transcript, a
+canned "read"); the part that matters — `parseDonation`, which turns a sentence
+like *"6 trays of baked ziti, 24 turkey sandwiches good till tomorrow"* into
+structured lines with inferred category and a date hint — is **real and tested**
+(handles number words, "a dozen", unit-vs-name disambiguation, relative expiry).
+Capture only ever produces a **draft**; every line is still verified at the dock,
+so a bad guess is caught, never shipped. That's the honest framing that keeps it
+from being a gimmick.
+
 The walk-in fast form survives as the demoted exception (a ghost "Walk-in"
 button) — it's the only inflow that truly starts at zero. *Conceptual-range note:
 a weigh-only "no item entry" concept was rejected precisely because it kills the

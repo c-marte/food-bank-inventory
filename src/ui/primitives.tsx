@@ -16,7 +16,9 @@ const ICON_PATHS: Record<
   | 'trash'
   | 'chevron'
   | 'inbox'
-  | 'clock',
+  | 'clock'
+  | 'mic'
+  | 'camera',
   ReactNode
 > = {
   check: <path d="M20 6 9 17l-5-5" />,
@@ -56,6 +58,18 @@ const ICON_PATHS: Record<
     <>
       <circle cx="12" cy="12" r="9" />
       <path d="M12 7v5l3 2" />
+    </>
+  ),
+  mic: (
+    <>
+      <rect x="9" y="2" width="6" height="12" rx="3" />
+      <path d="M5 10a7 7 0 0 0 14 0M12 17v4" />
+    </>
+  ),
+  camera: (
+    <>
+      <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+      <circle cx="12" cy="13" r="3.5" />
     </>
   ),
 };

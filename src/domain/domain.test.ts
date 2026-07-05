@@ -17,6 +17,7 @@ import {
 } from './requests';
 import { markWaste } from './waste';
 import { categoryDefaultExpiry, receiveDelivery } from './deliveries';
+import { parseDonation } from './parseDonation';
 import { buildSeed } from '../data/seed';
 
 const TODAY = '2026-07-04';
@@ -311,5 +312,42 @@ describe('receiveDelivery', () => {
   it('category default expiry is in the future and category-sensitive', () => {
     expect(categoryDefaultExpiry('produce', TODAY)).toBe(addDays(TODAY, 4));
     expect(categoryDefaultExpiry('canned', TODAY)).toBe(addDays(TODAY, 365));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseDonation — the real NL parser behind the (simulated) capture layer.
+// ---------------------------------------------------------------------------
+describe('parseDonation', () => {
+  it('parses a multi-item spoken sentence with units, names, and a date hint', () => {
+    const items = parseDonation(
+      '6 trays of baked ziti, 24 turkey sandwiches good till tomorrow, and 8 bowls of garden salad',
+      TODAY,
+    );
+    expect(items).toEqual([
+      { name: 'Baked Ziti', quantity: 6, unit: 'trays', category: 'grains', expiryDate: undefined },
+      { name: 'Turkey Sandwiches', quantity: 24, unit: 'units', category: 'protein', expiryDate: addDays(TODAY, 1) },
+      { name: 'Garden Salad', quantity: 8, unit: 'bowls', category: 'produce', expiryDate: undefined },
+    ]);
+  });
+
+  it('handles number words and "a dozen"', () => {
+    expect(parseDonation('a dozen eggs', TODAY)[0]).toMatchObject({ name: 'Eggs', quantity: 12, unit: 'units', category: 'protein' });
+    expect(parseDonation('two gallons of milk', TODAY)[0]).toMatchObject({ name: 'Milk', quantity: 2, unit: 'gallons', category: 'dairy' });
+  });
+
+  it('keeps the item name when the word after the count is not a unit', () => {
+    expect(parseDonation('10 cans black beans', TODAY)[0]).toMatchObject({ name: 'Black Beans', quantity: 10, unit: 'cans', category: 'canned' });
+    expect(parseDonation('5 jars peanut butter', TODAY)[0]).toMatchObject({ name: 'Peanut Butter', category: 'protein' });
+  });
+
+  it('parses relative and N-day expiry hints', () => {
+    expect(parseDonation('bread good for 3 days', TODAY)[0].expiryDate).toBe(addDays(TODAY, 3));
+    expect(parseDonation('milk expires today', TODAY)[0].expiryDate).toBe(addDays(TODAY, 0));
+  });
+
+  it('defaults a missing count to 1 and returns [] for empty input', () => {
+    expect(parseDonation('bananas', TODAY)[0]).toMatchObject({ name: 'Bananas', quantity: 1, category: 'produce' });
+    expect(parseDonation('   ', TODAY)).toEqual([]);
   });
 });
