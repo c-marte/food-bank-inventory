@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import type { Category, DeliveryItem, DeliveryKind, ISODate } from '../domain/types';
-import { CATEGORIES, CATEGORY_LABELS } from '../domain/types';
+import type { DeliveryItem, DeliveryKind, ISODate } from '../domain/types';
 import { addDays } from '../domain/dates';
 import { categoryDefaultExpiry } from '../domain/deliveries';
-import type { ParsedItem } from '../domain/parseDonation';
+import { guessCategory, type ParsedItem } from '../domain/parseDonation';
 import { KNOWN_DONORS } from '../data/seed';
 import { useStore } from '../store/useStore';
 import { Sheet } from '../ui/Sheet';
@@ -13,14 +12,14 @@ import { cn } from '../ui/cn';
 
 /**
  * Capture a delivery as a PROMISE — the 10-second phone-call manifest, before
- * the food arrives. Rough by design: name + rough count is enough. Expiry is
- * guessed from category here and VERIFIED at the dock. Creates an 'expected'
- * delivery that lands in Incoming.
+ * the food arrives. Genuinely rough: just name + count. Category is inferred
+ * silently (never asked here); expiry is guessed from category. Precision —
+ * confirming the category, verifying the printed date — happens ONCE, at the
+ * dock, not twice. Creates an 'expected' delivery that lands in Incoming.
  */
 interface Row {
   id: string;
   name: string;
-  category: Category;
   quantity: number;
   unit: string;
   /** Optional hint from capture ("good till tomorrow"); else the dock uses the
@@ -35,7 +34,7 @@ const WHEN_CHIPS = [
 ];
 
 function blankRow(): Row {
-  return { id: crypto.randomUUID(), name: '', category: 'other', quantity: 1, unit: 'units' };
+  return { id: crypto.randomUUID(), name: '', quantity: 1, unit: 'units' };
 }
 
 export function ExpectDeliverySheet({
@@ -73,7 +72,6 @@ export function ExpectDeliverySheet({
     const captured: Row[] = parsed.map((p) => ({
       id: crypto.randomUUID(),
       name: p.name,
-      category: p.category,
       quantity: p.quantity,
       unit: p.unit,
       expiryDate: p.expiryDate,
@@ -86,14 +84,17 @@ export function ExpectDeliverySheet({
 
   function submit() {
     if (!canSubmit) return;
-    const items: DeliveryItem[] = validRows.map((r) => ({
-      id: crypto.randomUUID(),
-      name: r.name.trim(),
-      category: r.category,
-      quantity: r.quantity,
-      unit: r.unit.trim() || 'units',
-      expiryDate: r.expiryDate ?? categoryDefaultExpiry(r.category, today),
-    }));
+    const items: DeliveryItem[] = validRows.map((r) => {
+      const category = guessCategory(r.name);
+      return {
+        id: crypto.randomUUID(),
+        name: r.name.trim(),
+        category,
+        quantity: r.quantity,
+        unit: r.unit.trim() || 'units',
+        expiryDate: r.expiryDate ?? categoryDefaultExpiry(category, today),
+      };
+    });
     addDelivery({
       donorName: donorName.trim(),
       kind,
@@ -163,55 +164,42 @@ export function ExpectDeliverySheet({
 
         <Field label="What's coming (rough is fine)">
           <p className="mb-2 text-xs text-zinc-500">
-            You'll verify exact counts and dates at the dock when it arrives.
+            Just a name and a rough count — you'll confirm the category and
+            verify the printed date once, at the dock.
           </p>
-          <ul className="space-y-2">
+          <ul className="divide-y divide-zinc-100">
             {rows.map((row) => (
-              <li key={row.id} className="rounded-lg border border-zinc-200 p-2.5">
-                <div className="flex items-center gap-2">
-                  <input
-                    value={row.name}
-                    onChange={(e) => patch(row.id, { name: e.target.value })}
-                    placeholder="Item name"
-                    className={cn(inputClass, 'h-10 flex-1')}
-                  />
-                  {rows.length > 1 && (
-                    <button
-                      onClick={() => setRows((rs) => rs.filter((r) => r.id !== row.id))}
-                      aria-label="Remove line"
-                      className="shrink-0 rounded-md p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-900"
-                    >
-                      <Icon name="x" size={16} />
-                    </button>
-                  )}
-                </div>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <select
-                    value={row.category}
-                    onChange={(e) => patch(row.id, { category: e.target.value as Category })}
-                    className="h-9 rounded-md border border-zinc-300 bg-white px-2 text-sm text-zinc-800 outline-none focus:border-zinc-950"
+              <li key={row.id} className="flex items-center gap-2 py-2">
+                <input
+                  value={row.name}
+                  onChange={(e) => patch(row.id, { name: e.target.value })}
+                  placeholder="Item name"
+                  className={cn(inputClass, 'h-10 flex-1')}
+                />
+                <Stepper
+                  size="sm"
+                  value={row.quantity}
+                  min={1}
+                  max={9999}
+                  onChange={(n) => patch(row.id, { quantity: n })}
+                  ariaLabel={`${row.name || 'Item'} quantity`}
+                />
+                <input
+                  value={row.unit}
+                  onChange={(e) => patch(row.id, { unit: e.target.value })}
+                  aria-label="Unit"
+                  placeholder="units"
+                  className={cn(inputClass, 'h-9 w-20 text-center text-zinc-500')}
+                />
+                {rows.length > 1 && (
+                  <button
+                    onClick={() => setRows((rs) => rs.filter((r) => r.id !== row.id))}
+                    aria-label="Remove line"
+                    className="shrink-0 rounded-md p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-900"
                   >
-                    {CATEGORIES.map((c) => (
-                      <option key={c} value={c}>
-                        {CATEGORY_LABELS[c]}
-                      </option>
-                    ))}
-                  </select>
-                  <Stepper
-                    size="sm"
-                    value={row.quantity}
-                    min={1}
-                    max={9999}
-                    onChange={(n) => patch(row.id, { quantity: n })}
-                    ariaLabel={`${row.name || 'Item'} quantity`}
-                  />
-                  <input
-                    value={row.unit}
-                    onChange={(e) => patch(row.id, { unit: e.target.value })}
-                    aria-label="Unit"
-                    className={cn(inputClass, 'h-9 w-24')}
-                  />
-                </div>
+                    <Icon name="x" size={16} />
+                  </button>
+                )}
               </li>
             ))}
           </ul>

@@ -139,14 +139,22 @@ Deliveries are the exact **mirror of Pickups**:
 | **Pickup** (out) | `requested` | Confirm | **decrements** referenced lots |
 | **Delivery** (in) | `expected` | Receive | **creates** one new lot per line |
 
-- **Expect a delivery** (`ExpectDeliverySheet`) — the 10-second call capture:
-  donor (one-tap chips for recurring sources), when, rough lines. Expiry is
-  **guessed from category** (`categoryDefaultExpiry`).
+- **Expect a delivery** (`ExpectDeliverySheet`) — the 10-second call capture,
+  genuinely rough: donor (one-tap chips for recurring sources), when, and
+  **just a name + count** per line. Category is inferred silently
+  (`guessCategory`) and expiry guessed from it (`categoryDefaultExpiry`) —
+  neither is shown or asked here, so precision isn't done twice.
 - **Incoming** (`IncomingDeliveries`, on Home) — expected promises, time-sorted.
-- **Receive at the dock** (`ReceiveDeliverySheet`) — the one human checkpoint:
-  verify counts, **verify each best-before against the printed label** (amber
-  field), toss what's unusable, add surprises, confirm → `receiveDelivery`
-  creates a new lot per kept line (rule 1: never merged). Pure + tested.
+- **Receive at the dock** (`ReceiveDeliverySheet`) — the one human checkpoint,
+  and it now *looks* like one: every inferred category and guessed best-before
+  renders with a visible **amber "guessed" state** (a ring + a one-tap confirm
+  affordance) that clears the instant the volunteer confirms or edits it —
+  turning to a quiet emerald "verified." A running "N guessed fields
+  unconfirmed" caption sits by the submit button, so the checkpoint is
+  something you can *see*, not just something the architecture claims exists.
+  Confirm/edit counts, verify against the printed label, toss what's unusable,
+  add surprises, then `receiveDelivery` creates a new lot per kept line
+  (rule 1: never merged). Pure + tested.
 
 #### Capture layer — automate the transcription, not the verification
 
