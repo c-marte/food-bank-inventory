@@ -7,7 +7,7 @@ import { cn } from './cn';
 // Icons — small inline SVGs (no icon dependency). currentColor, 2px stroke.
 // ---------------------------------------------------------------------------
 const ICON_PATHS: Record<
-  IconKey | 'plus' | 'minus' | 'reset' | 'arrow' | 'edit',
+  IconKey | 'plus' | 'minus' | 'reset' | 'arrow' | 'edit' | 'trash' | 'chevron',
   ReactNode
 > = {
   check: <path d="M20 6 9 17l-5-5" />,
@@ -29,6 +29,14 @@ const ICON_PATHS: Record<
   ),
   arrow: <path d="M5 12h14M13 6l6 6-6 6" />,
   edit: <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />,
+  trash: (
+    <>
+      <path d="M3 6h18" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </>
+  ),
+  chevron: <path d="M9 18l6-6-6-6" />,
 };
 
 export function Icon({

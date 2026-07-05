@@ -8,6 +8,7 @@ import {
   getPartnerAvailability,
   validateRequestItems,
 } from './requests';
+import { markWaste } from './waste';
 import { buildSeed } from '../data/seed';
 
 const TODAY = '2026-07-04';
@@ -196,5 +197,48 @@ describe('seed data populates both zones (deterministic across dates)', () => {
     const milk = seed.lots.filter((l) => l.name === 'Whole Milk');
     expect(milk.length).toBe(2);
     expect(milk[0].expiryDate).not.toBe(milk[1].expiryDate);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Waste — the third verb. Partial allowed, clamped, recorded as an event.
+// ---------------------------------------------------------------------------
+describe('markWaste', () => {
+  it('partial waste decrements and records the event', () => {
+    const lots = [lot({ id: 'l1', name: 'Bananas', unit: 'bunches', quantity: 8 })];
+    const res = markWaste('l1', 3, lots, TODAY, 'w1')!;
+    expect(res.lots.find((l) => l.id === 'l1')!.quantity).toBe(5);
+    expect(res.wasted).toBe(3);
+    expect(res.event).toMatchObject({
+      id: 'w1', lotId: 'l1', lotName: 'Bananas', unit: 'bunches', quantity: 3, date: TODAY,
+    });
+  });
+
+  it('full waste zeroes the lot but keeps the row (never deleted)', () => {
+    const lots = [lot({ id: 'l1', quantity: 4 })];
+    const res = markWaste('l1', 4, lots, TODAY, 'w1')!;
+    expect(res.lots.find((l) => l.id === 'l1')!.quantity).toBe(0);
+    expect(res.lots.length).toBe(1);
+  });
+
+  it('over-waste clamps at what is on hand', () => {
+    const lots = [lot({ id: 'l1', quantity: 4 })];
+    const res = markWaste('l1', 99, lots, TODAY, 'w1')!;
+    expect(res.wasted).toBe(4);
+    expect(res.lots.find((l) => l.id === 'l1')!.quantity).toBe(0);
+  });
+
+  it('rejects zero/negative quantity, unknown lot, and empty lot', () => {
+    const lots = [lot({ id: 'l1', quantity: 4 }), lot({ id: 'l0', quantity: 0 })];
+    expect(markWaste('l1', 0, lots, TODAY, 'w1')).toBeNull();
+    expect(markWaste('l1', -2, lots, TODAY, 'w1')).toBeNull();
+    expect(markWaste('missing', 1, lots, TODAY, 'w1')).toBeNull();
+    expect(markWaste('l0', 1, lots, TODAY, 'w1')).toBeNull();
+  });
+
+  it('does not mutate the input lots array', () => {
+    const lots = [lot({ id: 'l1', quantity: 8 })];
+    markWaste('l1', 3, lots, TODAY, 'w1');
+    expect(lots[0].quantity).toBe(8);
   });
 });

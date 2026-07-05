@@ -3,6 +3,7 @@ import type { InventoryLot } from '../domain/types';
 import { daysUntil } from '../domain/dates';
 import { getExpiringZoneLots } from '../domain/dashboard';
 import { useStore } from '../store/useStore';
+import { useUI } from '../store/useUI';
 import { Card, EmptyCard, Icon, SectionHeader } from '../ui/primitives';
 import { cn } from '../ui/cn';
 import { SPRING } from '../ui/motion';
@@ -25,6 +26,7 @@ interface Bucket {
 
 export function MoveFirstZone() {
   const { lots, today, config } = useStore();
+  const { openLot } = useUI();
   const zone = getExpiringZoneLots(lots, today, config);
   const d = (lot: InventoryLot) => daysUntil(lot.expiryDate, today);
 
@@ -98,6 +100,7 @@ export function MoveFirstZone() {
                         lot={lot}
                         days={d(lot)}
                         window={config.expiringSoonWindowDays}
+                        onOpen={() => openLot(lot.id)}
                       />
                     </motion.li>
                   ))}
@@ -115,17 +118,23 @@ function ZoneRow({
   lot,
   days,
   window,
+  onOpen,
 }: {
   lot: InventoryLot;
   days: number;
   window: number;
+  onOpen: () => void;
 }) {
   const urgent = days <= 1;
   // Time-to-zero: full bar = a whole window of life left; sliver = dying now.
   const frac = Math.max(0.07, Math.min(1, days / window));
 
   return (
-    <div className="flex items-center gap-3 py-1.5">
+    <button
+      onClick={onOpen}
+      className="group -mx-1.5 flex w-[calc(100%+0.75rem)] items-center gap-3 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950"
+      aria-label={`${lot.name} — ${lot.quantity} ${lot.unit}, ${days} days left. Open actions.`}
+    >
       <span className="min-w-0 flex-1 truncate font-medium text-zinc-950">
         {lot.name}
       </span>
@@ -154,6 +163,11 @@ function ZoneRow({
       >
         {days}d
       </span>
-    </div>
+      <Icon
+        name="chevron"
+        size={14}
+        className="shrink-0 text-zinc-200 transition-colors group-hover:text-zinc-500"
+      />
+    </button>
   );
 }

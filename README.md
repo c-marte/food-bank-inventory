@@ -89,20 +89,40 @@ is deterministic and the seed is testable. The boundary assertions in
 - **`src/store/useStore.tsx`** — the single client-side store (reducer +
   context). `today` captured once at load. Mirrors to `localStorage` same-day;
   re-seeds fresh on a new day so async reviewers always open to live data.
-- **The surface** (`components/Dashboard.tsx`), top to bottom:
-  - **Act first** (`TriageBar`) — the focusing layer: the single most urgent
-    lot as a headline, then state-of-the-shelf counts.
-  - **Move first** (`MoveFirstZone`) — the clock. Time buckets carry the
-    "when" once; each lot gets a **time-to-zero bar** (days left vs. the 7-day
-    window — nearly empty means nearly dead) plus a day glyph. No status pills
-    here: the zone itself means "expiring."
-  - **Low stock** — per-category, sum of non-expired quantity vs. threshold,
-    lowest fill ratio first. Independent of the clock by design: a lot can be
-    in both zones and that's two true facts, not a duplicate.
-  - **Pickups** (`PickupsQueue` + `RecordPickupSheet`) — the outflow queue.
-  - **Full inventory** (`LotList`) — the ledger: every lot, statuses mixed
-    (badges allowed here), zero-quantity kept and de-emphasized as "0
-    remaining," corrections behind a tap-to-reveal stepper.
+  `src/store/useUI.tsx` holds shell state: which spoke is visible, which sheet
+  is open.
+
+### Hub-and-spoke IA
+
+**Home is status + entry points; work lives on pages; mutations are sheets**
+(the Mercury home pattern, scaled to three destinations — tabs, not a sidebar,
+because nav chrome should match destination count).
+
+- **Home** — the action row (*Log donation*, *Record pickup*), then **Act
+  first** (`TriageBar`): the single most urgent lot as a tappable headline,
+  plus state-of-the-shelf counts with paths (expired → filtered ledger,
+  pickups → queue). Then the clock in two readings: the **decay timeline**
+  (lots plotted on their death day as food-emoji markers; same-day piles fan
+  out on tap) and **Move first** (time buckets + a **time-to-zero bar** per
+  lot). **Low stock** beside it, independent by design. Summary cards jump to
+  the spokes.
+- **Pickups** (`PickupsQueue`) — the outflow queue: pending requests confirm
+  here (rule 2), partial fulfillment named in the reminder.
+- **Inventory** (`LotList`) — the ledger: every lot, statuses mixed, an
+  **Expired only** filter (the triage path lands here), zero-quantity kept and
+  de-emphasized.
+
+### The verb layer
+
+Every lot, everywhere it appears — timeline marker, Move-first row, ledger
+row, the Act-first headline — opens the same **lot action sheet**
+(`LotActionSheet`) with three verbs mapping to physical reality:
+
+| Physical act | Verb | Behavior |
+|---|---|---|
+| "Call a partner, move it" | **Send to partner** | Opens Record pickup **prefilled** with the lot; disabled for expired (never ships) |
+| "Pull it, toss it" | **Mark as waste** | **Partial allowed** (half the bananas can be fine), clamped, records a `WasteEvent` — spoilage is the #1 success metric and unrecorded waste can't be measured (`domain/waste.ts`, pure + tested) |
+| "Count is off" | **Adjust quantity** | Correction only; no waste record |
 - **Motion** (`ui/motion.ts`) — spring-first, and only on real mutations:
   the reminder springs in, zone rows reflow when a confirm drains a lot,
   triage numbers pop on change. Collapses to instant under

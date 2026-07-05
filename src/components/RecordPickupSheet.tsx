@@ -20,23 +20,31 @@ import { cn } from '../ui/cn';
 export function RecordPickupSheet({
   open,
   onClose,
+  initialLotId,
 }: {
   open: boolean;
   onClose: () => void;
+  /** When set, that lot arrives pre-selected at its full on-hand quantity —
+   *  the "send to partner" verb from the lot action sheet. */
+  initialLotId?: string | null;
 }) {
   const { lots, partners, today, config, createRequest } = useStore();
   const [partnerId, setPartnerId] = useState(partners[0]?.id ?? '');
   const [sel, setSel] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
 
-  // Fresh slate each time the sheet opens.
+  // Fresh slate each time the sheet opens; prefill when launched from a lot.
   useEffect(() => {
     if (open) {
-      setSel({});
+      const prefill = initialLotId
+        ? lots.find((l) => l.id === initialLotId)
+        : undefined;
+      setSel(prefill && prefill.quantity > 0 ? { [prefill.id]: prefill.quantity } : {});
       setError(null);
       setPartnerId(partners[0]?.id ?? '');
     }
-  }, [open, partners]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialLotId, partners]);
 
   const availability = getPartnerAvailability(lots, today, config);
   const items = Object.entries(sel)

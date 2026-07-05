@@ -4,7 +4,8 @@ import { CATEGORIES, CATEGORY_LABELS } from '../domain/types';
 import { daysUntil } from '../domain/dates';
 import { getLotStatus } from '../domain/status';
 import { useStore } from '../store/useStore';
-import { Card, Icon, SectionHeader, StatusBadge, Stepper } from '../ui/primitives';
+import { useUI } from '../store/useUI';
+import { Card, Icon, SectionHeader, StatusBadge } from '../ui/primitives';
 import { STATUS_META, fullDateLabel, shortDayLabel } from '../ui/format';
 import { cn } from '../ui/cn';
 
@@ -22,8 +23,12 @@ function buildGroups(
   config: Config,
   filter: Category | 'all',
   showEmpty: boolean,
+  expiredOnly: boolean,
 ): LotGroup[] {
   let visible = filter === 'all' ? lots : lots.filter((l) => l.category === filter);
+  if (expiredOnly) {
+    visible = visible.filter((l) => getLotStatus(l, today, config) === 'expired');
+  }
   if (!showEmpty) visible = visible.filter((l) => l.quantity > 0);
 
   const byName = new Map<string, InventoryLot[]>();
@@ -55,14 +60,14 @@ function buildGroups(
 }
 
 export function LotList() {
-  const { lots, today, config, updateLotQuantity } = useStore();
+  const { lots, today, config } = useStore();
+  const { openLot, expiredOnly, setExpiredOnly } = useUI();
   const [filter, setFilter] = useState<Category | 'all'>('all');
   const [showEmpty, setShowEmpty] = useState(true);
-  const [editingId, setEditingId] = useState<string | null>(null);
 
   const groups = useMemo(
-    () => buildGroups(lots, today, config, filter, showEmpty),
-    [lots, today, config, filter, showEmpty],
+    () => buildGroups(lots, today, config, filter, showEmpty, expiredOnly),
+    [lots, today, config, filter, showEmpty, expiredOnly],
   );
 
   const totalLots = filter === 'all' ? lots.length : lots.filter((l) => l.category === filter).length;
@@ -90,8 +95,21 @@ export function LotList() {
         Full inventory
       </SectionHeader>
 
-      {/* Category filter */}
+      {/* Filters: status first (the triage "expired" path lands here), then category. */}
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+        <button
+          onClick={() => setExpiredOnly(!expiredOnly)}
+          aria-pressed={expiredOnly}
+          className={cn(
+            'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950',
+            expiredOnly
+              ? 'border-red-600 bg-red-600 text-white'
+              : 'border-red-200 bg-white text-red-700 hover:border-red-400',
+          )}
+        >
+          <Icon name="x" size={12} /> Expired only
+        </button>
+        <span className="my-1 w-px shrink-0 bg-zinc-200" aria-hidden />
         <FilterChip active={filter === 'all'} onClick={() => setFilter('all')}>
           All
         </FilterChip>
@@ -130,11 +148,7 @@ export function LotList() {
                     lot={lot}
                     today={today}
                     config={config}
-                    editing={editingId === lot.id}
-                    onToggleEdit={() =>
-                      setEditingId((cur) => (cur === lot.id ? null : lot.id))
-                    }
-                    onQty={(n) => updateLotQuantity(lot.id, n)}
+                    onOpen={() => openLot(lot.id)}
                   />
                 ))}
               </ul>
@@ -179,79 +193,55 @@ function LotRow({
   lot,
   today,
   config,
-  editing,
-  onToggleEdit,
-  onQty,
+  onOpen,
 }: {
   lot: InventoryLot;
   today: ISODate;
   config: Config;
-  editing: boolean;
-  onToggleEdit: () => void;
-  onQty: (n: number) => void;
+  onOpen: () => void;
 }) {
   const status = getLotStatus(lot, today, config);
   const d = daysUntil(lot.expiryDate, today);
   const empty = lot.quantity === 0;
 
+  // The whole row opens the lot's verb layer — send / waste / adjust all live
+  // in the one action sheet, same as everywhere else in the app.
   return (
-    <li
-      className={cn(
-        'flex items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-zinc-50',
-        empty && !editing && 'opacity-55',
-      )}
-    >
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <StatusBadge status={status} />
-          <span className="nums text-[13px] text-zinc-500">
-            exp {fullDateLabel(lot.expiryDate)}
-            <span className={cn('ml-1.5 font-semibold', STATUS_META[status].text)}>
-              {shortDayLabel(d)}
+    <li>
+      <button
+        onClick={onOpen}
+        className={cn(
+          'group flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950',
+          empty && 'opacity-55',
+        )}
+        aria-label={`${lot.name}, ${empty ? 'empty' : `${lot.quantity} ${lot.unit}`}. Open actions.`}
+      >
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <StatusBadge status={status} />
+            <span className="nums text-[13px] text-zinc-500">
+              exp {fullDateLabel(lot.expiryDate)}
+              <span className={cn('ml-1.5 font-semibold', STATUS_META[status].text)}>
+                {shortDayLabel(d)}
+              </span>
             </span>
-          </span>
+          </div>
+          <div className="nums mt-1 text-xs text-zinc-500">
+            {empty ? (
+              <span className="text-zinc-400">0 remaining</span>
+            ) : (
+              <>
+                {lot.quantity} <span className="text-zinc-400">{lot.unit}</span>
+              </>
+            )}
+          </div>
         </div>
-        <div className="nums mt-1 text-xs text-zinc-500">
-          {empty ? (
-            <span className="text-zinc-400">0 remaining</span>
-          ) : (
-            <>
-              {lot.quantity} <span className="text-zinc-400">{lot.unit}</span>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Corrections are rare — the stepper reveals on demand instead of
-          shouting from every row. */}
-      {editing ? (
-        <div className="flex shrink-0 items-center gap-1.5">
-          <Stepper
-            size="sm"
-            value={lot.quantity}
-            min={0}
-            max={999}
-            onChange={onQty}
-            ariaLabel={`Adjust ${lot.name} quantity`}
-          />
-          <button
-            onClick={onToggleEdit}
-            aria-label="Done adjusting"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-zinc-950 text-white hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950"
-          >
-            <Icon name="check" size={14} />
-          </button>
-        </div>
-      ) : (
-        <button
-          onClick={onToggleEdit}
-          aria-label={`Adjust ${lot.name} quantity`}
-          title="Adjust quantity"
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950"
-        >
-          <Icon name="edit" size={14} />
-        </button>
-      )}
+        <Icon
+          name="chevron"
+          size={15}
+          className="shrink-0 text-zinc-200 transition-colors group-hover:text-zinc-500"
+        />
+      </button>
     </li>
   );
 }

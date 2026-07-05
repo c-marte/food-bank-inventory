@@ -1,18 +1,17 @@
-import { useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import type { Config, InventoryLot, ISODate, PickupRequest } from '../domain/types';
 import { getLotStatus } from '../domain/status';
 import { useStore } from '../store/useStore';
+import { useUI } from '../store/useUI';
 import { Button, Card, EmptyCard, Icon, SectionHeader } from '../ui/primitives';
 import { cn } from '../ui/cn';
 import { SPRING } from '../ui/motion';
-import { RecordPickupSheet } from './RecordPickupSheet';
 
 /** The outflow queue. Requests arrive (seeded, or recorded by staff when a
  *  partner calls) and Confirm is the moment stock actually leaves the shelf. */
 export function PickupsQueue() {
   const { requests, lots, partners, today, config, confirmRequest } = useStore();
-  const [recording, setRecording] = useState(false);
+  const { openPickup } = useUI();
 
   const sorted = [...requests].sort((a, b) => {
     // Pending first, then by id for stability.
@@ -35,7 +34,7 @@ export function PickupsQueue() {
                 all clear
               </span>
             )}
-            <Button size="sm" variant="outline" onClick={() => setRecording(true)}>
+            <Button size="sm" variant="outline" onClick={() => openPickup()}>
               <Icon name="plus" size={13} /> Record pickup
             </Button>
           </div>
@@ -65,8 +64,6 @@ export function PickupsQueue() {
           </AnimatePresence>
         </ul>
       )}
-
-      <RecordPickupSheet open={recording} onClose={() => setRecording(false)} />
     </Card>
   );
 }

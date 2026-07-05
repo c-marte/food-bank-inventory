@@ -4,6 +4,7 @@ import type { InventoryLot } from '../domain/types';
 import { CATEGORY_LABELS } from '../domain/types';
 import { addDays, daysUntil, parseLocalDate } from '../domain/dates';
 import { useStore } from '../store/useStore';
+import { useUI } from '../store/useUI';
 import { Card, EmptyCard, Icon, SectionHeader } from '../ui/primitives';
 import { foodEmoji } from '../ui/foodEmoji';
 import { cn } from '../ui/cn';
@@ -30,6 +31,7 @@ interface DayGroup {
 
 export function DecayTimeline() {
   const { lots, today } = useStore();
+  const { openLot } = useUI();
   const [windowDays, setWindowDays] = useState(7);
   const [selected, setSelected] = useState<number | null>(null);
 
@@ -153,6 +155,10 @@ export function DecayTimeline() {
                     onToggle={() =>
                       setSelected((cur) => (cur === g.day ? null : g.day))
                     }
+                    onOpenLot={(lotId) => {
+                      setSelected(null);
+                      openLot(lotId);
+                    }}
                   />
                 ))}
               </div>
@@ -175,12 +181,14 @@ function DayPile({
   today,
   expanded,
   onToggle,
+  onOpenLot,
 }: {
   group: DayGroup;
   windowDays: number;
   today: string;
   expanded: boolean;
   onToggle: () => void;
+  onOpenLot: (lotId: string) => void;
 }) {
   const left = (group.day / windowDays) * 100;
   const n = group.lots.length;
@@ -198,11 +206,13 @@ function DayPile({
       style={{ left: `${left}%` }}
       transition={SPRING.reflow}
     >
-      {/* Collapsed cluster — the handle */}
+      {/* Collapsed cluster — the handle. A single-lot pile skips the fan and
+          opens the lot's verbs directly. */}
       <button
         onClick={(e) => {
           e.stopPropagation();
-          onToggle();
+          if (n === 1) onOpenLot(group.lots[0].id);
+          else onToggle();
         }}
         className="absolute bottom-0 -translate-x-1/2 cursor-pointer focus-visible:outline-none"
         style={{ height: 40, width: 40 }}
@@ -268,27 +278,34 @@ function DayPile({
             </div>
             <ul className="space-y-0.5">
               {group.lots.map((lot) => (
-                <li
-                  key={lot.id}
-                  className="flex items-center gap-2 rounded-lg px-1 py-1"
-                >
-                  <motion.span
-                    layoutId={`chip-${lot.id}`}
-                    className={cn(
-                      'flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-lg shadow-sm ring-1',
-                      urgent ? 'ring-red-200' : 'ring-zinc-200',
-                    )}
+                <li key={lot.id}>
+                  <button
+                    onClick={() => onOpenLot(lot.id)}
+                    className="group flex w-full items-center gap-2 rounded-lg px-1 py-1 text-left transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950"
                   >
-                    {foodEmoji(lot.name)}
-                  </motion.span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-zinc-950">
-                      {lot.name}
+                    <motion.span
+                      layoutId={`chip-${lot.id}`}
+                      className={cn(
+                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-lg shadow-sm ring-1',
+                        urgent ? 'ring-red-200' : 'ring-zinc-200',
+                      )}
+                    >
+                      {foodEmoji(lot.name)}
+                    </motion.span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-zinc-950">
+                        {lot.name}
+                      </span>
+                      <span className="nums block text-[11px] text-zinc-500">
+                        {lot.quantity} {lot.unit} · {CATEGORY_LABELS[lot.category]}
+                      </span>
                     </span>
-                    <span className="nums block text-[11px] text-zinc-500">
-                      {lot.quantity} {lot.unit} · {CATEGORY_LABELS[lot.category]}
-                    </span>
-                  </span>
+                    <Icon
+                      name="chevron"
+                      size={14}
+                      className="shrink-0 text-zinc-200 transition-colors group-hover:text-zinc-500"
+                    />
+                  </button>
                 </li>
               ))}
             </ul>

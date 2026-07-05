@@ -13,10 +13,12 @@ import type {
   Partner,
   PickupRequest,
   RequestItem,
+  WasteEvent,
 } from '../domain/types';
 import { todayISO } from '../domain/dates';
 import { buildSeed } from '../data/seed';
 import { confirmRequest as domainConfirmRequest } from '../domain/requests';
+import { markWaste as domainMarkWaste } from '../domain/waste';
 
 // ---------------------------------------------------------------------------
 // The single client-side store. One surface, one user (the shelf-keeper), two
@@ -30,6 +32,7 @@ interface StoreState {
   lots: InventoryLot[];
   requests: PickupRequest[];
   partners: Partner[];
+  wasteEvents: WasteEvent[];
   config: Config;
   today: ISODate;
   lastReminder: string | null;
@@ -40,6 +43,7 @@ type Action =
   | { type: 'UPDATE_QUANTITY'; lotId: string; quantity: number }
   | { type: 'ADD_REQUEST'; request: PickupRequest }
   | { type: 'CONFIRM'; requestId: string }
+  | { type: 'MARK_WASTE'; lotId: string; quantity: number; eventId: string }
   | { type: 'DISMISS_REMINDER' }
   | { type: 'RESET' };
 
@@ -49,6 +53,7 @@ function freshState(today: ISODate): StoreState {
     lots: seed.lots,
     requests: seed.requests,
     partners: seed.partners,
+    wasteEvents: [],
     config: seed.config,
     today,
     lastReminder: null,
@@ -96,6 +101,25 @@ function reducer(state: StoreState, action: Action): StoreState {
       };
     }
 
+    case 'MARK_WASTE': {
+      // The third verb: pull it, toss it, record it. Delegates to the pure
+      // domain function; partial waste allowed, clamped at what's on hand.
+      const res = domainMarkWaste(
+        action.lotId,
+        action.quantity,
+        state.lots,
+        state.today,
+        action.eventId,
+      );
+      if (!res) return state; // unknown lot, empty lot, or bad quantity
+      return {
+        ...state,
+        lots: res.lots,
+        wasteEvents: [...state.wasteEvents, res.event],
+        lastReminder: `Waste logged: ${res.wasted} ${res.event.unit} of ${res.event.lotName} pulled from the shelf.`,
+      };
+    }
+
     case 'DISMISS_REMINDER':
       return { ...state, lastReminder: null };
 
@@ -107,11 +131,14 @@ function reducer(state: StoreState, action: Action): StoreState {
   }
 }
 
-const STORAGE_KEY = 'food-bank-inventory:v2';
+const STORAGE_KEY = 'food-bank-inventory:v3';
 
 interface PersistShape {
   today: ISODate;
-  data: Pick<StoreState, 'lots' | 'requests' | 'partners' | 'config'>;
+  data: Pick<
+    StoreState,
+    'lots' | 'requests' | 'partners' | 'wasteEvents' | 'config'
+  >;
 }
 
 /** Load persisted state, but only if it was seeded TODAY. On a new day we
@@ -122,7 +149,12 @@ function loadInitial(today: ISODate): StoreState {
     if (raw) {
       const saved = JSON.parse(raw) as PersistShape;
       if (saved.today === today && saved.data?.lots) {
-        return { ...saved.data, today, lastReminder: null };
+        return {
+          ...saved.data,
+          wasteEvents: saved.data.wasteEvents ?? [],
+          today,
+          lastReminder: null,
+        };
       }
     }
   } catch {
@@ -136,6 +168,7 @@ interface StoreValue extends StoreState {
   updateLotQuantity: (lotId: string, quantity: number) => void;
   createRequest: (partnerId: string, items: RequestItem[]) => PickupRequest;
   confirmRequest: (requestId: string) => void;
+  markWaste: (lotId: string, quantity: number) => void;
   dismissReminder: () => void;
   reset: () => void;
 }
@@ -155,6 +188,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         lots: state.lots,
         requests: state.requests,
         partners: state.partners,
+        wasteEvents: state.wasteEvents,
         config: state.config,
       },
     };
@@ -185,6 +219,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return request;
     },
     confirmRequest: (requestId) => dispatch({ type: 'CONFIRM', requestId }),
+    markWaste: (lotId, quantity) =>
+      dispatch({
+        type: 'MARK_WASTE',
+        lotId,
+        quantity,
+        eventId: crypto.randomUUID(),
+      }),
     dismissReminder: () => dispatch({ type: 'DISMISS_REMINDER' }),
     reset: () => dispatch({ type: 'RESET' }),
   };

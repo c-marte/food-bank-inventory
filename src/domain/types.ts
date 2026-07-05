@@ -55,6 +55,19 @@ export interface PickupRequest {
   status: 'requested' | 'confirmed';
 }
 
+/** A recorded discard: food physically pulled from the shelf and tossed.
+ *  First-class, not a silent quantity edit — spoilage is the product's #1
+ *  success metric, and you can't measure what you don't record. */
+export interface WasteEvent {
+  id: string;
+  lotId: string;
+  /** Snapshot for display — the lot's name/unit at the time of the event. */
+  lotName: string;
+  unit: string;
+  quantity: number;
+  date: ISODate;
+}
+
 export interface Config {
   /** Per-category low-stock threshold. Sum of non-expired quantity strictly
    *  below this flags the category as low. */
