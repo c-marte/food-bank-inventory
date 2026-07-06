@@ -111,17 +111,30 @@ distribution).
   **Low stock** — is one tap away behind **"View the full shelf"** (reference,
   not the daily driver).
 
-  Each tile carries one equal-height visual anchor (`FlowTileVisuals`):
-  - **Food In** splits into **two real counts — deliveries vs. our pickups —
-    never lumped.** A delivery (the donor drops off) and a pickup (one of ours
-    drives out, e.g. collecting catering surplus) share the same "expected"
-    status but move in opposite directions; merging them into one "N expected"
-    number lied about what was actually about to happen. Below the counts, a
-    static, non-live **origin → dock map**: a pinned donor name, an abstract
-    dashed route (no fabricated street data), a home glyph for our dock, and a
-    direction chip ("DROP-OFF" / "WE PICK UP"). Modeled on package-tracking UIs
-    (Shop, Klarna) but deliberately **not** a live GPS tracker — we have no
-    real-time position, so a moving dot would be a lie the interface tells.
+  Both tiles are **flex columns whose heights always match**: the grid uses
+  `items-stretch`, each `Card` is `flex h-full flex-col`, and the visual anchor
+  in the middle is wrapped `flex-1` so it grows or shrinks to absorb whatever
+  height difference the grid enforces — the action row and its quick-add link
+  stay flush at the bottom of both tiles regardless of which one has more
+  content above.
+
+  - **Food In**'s two real counts — **pickups (we go)** vs. **deliveries** —
+    are **tabs, not just labels**. They're never lumped (a delivery is the
+    donor coming to us; a pickup is one of ours driving out — same "expected"
+    status, opposite direction) — but now clicking one also **swaps the
+    metadata and the map below it** to that trip. Pickup is the default tab:
+    "Sal's Catering is ready for pickup [avatar] · pick up by 3pm," map in
+    "WE PICK UP" mode. Switching to Delivery shows the ETA, the donor, and a
+    **cross-check item list** (`CrossCheckItems`: "12 Wheat Bread · 15 Bananas
+    · 6 Whole Milk") so the receiver can verify what arrives against what was
+    promised — and deliberately **no avatar**, since anyone can receive a
+    delivery (only a pickup has one specific person who has to go get it). The
+    map (`FlowTileVisuals.DeliveryOriginMap`) is a static, non-live
+    **origin → dock illustration** — a pinned donor name, an abstract dashed
+    route (no fabricated street data), a home glyph, a direction chip
+    ("DROP-OFF" / "WE PICK UP"). Modeled on package-tracking UIs (Shop, Klarna)
+    but deliberately **not** live GPS — we have no real-time position, so a
+    moving dot would be a lie the interface tells.
   - **Food Out** mirrors the outbound **pipeline** (below): a per-stage status
     board — *Pack / Match / Handoff* — with the owner's name under each stage,
     not a fabricated single-item journey. A literal 4-node tracker (Selected →

@@ -30,7 +30,7 @@ export function DeliveryOriginMap({
   outbound?: boolean;
 }) {
   return (
-    <div className="relative h-28 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50">
+    <div className="relative h-full min-h-28 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50">
       <svg
         className="absolute inset-0 h-full w-full"
         viewBox="0 0 100 100"
@@ -97,7 +97,7 @@ interface StatusBucket {
  *  state (getMovementStage), not a fabricated per-item journey. */
 export function OutboundStatusBoard({ buckets }: { buckets: StatusBucket[] }) {
   return (
-    <div className="flex h-28 flex-col justify-center rounded-xl border border-zinc-200 bg-zinc-50 px-4">
+    <div className="flex h-full min-h-28 flex-col justify-center rounded-xl border border-zinc-200 bg-zinc-50 px-4">
       <div className="flex items-center justify-between">
         {buckets.map((b) => (
           <span
