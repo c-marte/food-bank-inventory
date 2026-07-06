@@ -57,6 +57,13 @@ export function addDays(iso: ISODate, days: number): ISODate {
   return toISODate(date);
 }
 
+/** January 1 of `today`'s year — the YTD window start. Not a fixed day-count
+ *  (unlike a rolling 30-day window), so it's computed from the calendar, not
+ *  approximated with addDays. */
+export function yearStartDate(today: ISODate): ISODate {
+  return `${today.slice(0, 4)}-01-01`;
+}
+
 /** Human-friendly relative label for a day count. */
 export function relativeDayLabel(days: number): string {
   if (days === 0) return 'Today';

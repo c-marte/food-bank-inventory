@@ -104,6 +104,7 @@ export function receiveDelivery(
   const nextDelivery: Delivery = {
     ...delivery,
     status: 'received',
+    receivedDate: today,
     items: kept,
   };
   const created = newLots.length;

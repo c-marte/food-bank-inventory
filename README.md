@@ -194,6 +194,35 @@ catering-surplus pickup, a grocery drop-off, and a partner delivery are all the
 "same" event type but opposite directions, and conflating them was the bug
 this fixed.
 
+### Impact — a quiet, retrospective strip
+
+`ImpactSection` sits **last** on the Shelf page, below "View the full shelf" —
+deliberately, because it's morale content, not actionable content. It never
+competes with Act First or the Food In/Out tiles for attention, the same
+reasoning that demoted the decay timeline behind a fold earlier. Modeled on
+Lemonade Giveback's quiet card (one honest number + one plain sentence, no
+chart, no goal ring) after checking GoFundMe (goal rings — doesn't fit, we
+have no fundraising target), iFood (bar chart across months — heavier than
+needed), and Finch (milestones + testimonials — richer than a v1 needs) on
+Mobbin. A **right-rail placement was considered and rejected**: it would only
+exist on desktop and contradicts the single-column, tabs-not-sidebar
+architecture already committed to for Shelf/Intake/Distribution.
+
+A **30-day / year-to-date toggle** (`getImpactStats`, `domain/impact.ts`)
+computes four numbers, every one a real count from records that exist
+elsewhere in the app — donations logged, movements released to shelters vs.
+family boxes packed, and distinct donors — plus a diversion-rate sentence
+(released ÷ (released + wasted), from real `OutboundMovement` and
+`WasteEvent` totals). **Deliberately absent: a "pounds redistributed" total.**
+Lots carry mixed units (cans, gallons, loaves, trays) with no weight
+conversion, so summing quantities across units would fabricate a number
+precision can't back up — the same reasoning that ruled out a live GPS
+tracker on the delivery map and a fake 4-stage fulfillment stepper earlier in
+this build. Seed data includes a batch of already-released historical
+movements and already-received historical deliveries (relative to `today`,
+same pattern as every other seed date), so the numbers aren't zero on first
+load.
+
 ### Perishability tiers — the axis the job turns on
 
 Every lot carries a **handling tier** (`PerishTier`: prepared / fresh /

@@ -5,6 +5,7 @@ import { FlowTiles } from './FlowTiles';
 import { DecayTimeline } from './DecayTimeline';
 import { MoveFirstZone } from './MoveFirstZone';
 import { LowStockZone } from './LowStockZone';
+import { ImpactSection } from './ImpactSection';
 import { Icon } from '../ui/primitives';
 import { cn } from '../ui/cn';
 import { SPRING } from '../ui/motion';
@@ -62,6 +63,9 @@ export function Home() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Retrospective, not actionable — last on the page by design. */}
+      <ImpactSection />
     </div>
   );
 }

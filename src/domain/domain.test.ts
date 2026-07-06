@@ -432,17 +432,21 @@ describe('distribution — dying lots + FEFO box (the pipeline doors)', () => {
 describe('seed movements populate every pipeline stage', () => {
   it('one movement at pack, one at match, one at handoff — all lines valid', () => {
     const seed = buildSeed(TODAY);
-    const stages = seed.movements.map(getMovementStage).sort();
+    const open = seed.movements.filter((m) => m.status === 'open');
+    const stages = open.map(getMovementStage).sort();
     expect(stages).toEqual(['handoff', 'match', 'pack']);
-    // every line references a real, stocked lot
-    for (const m of seed.movements) {
+    // every OPEN movement's lines reference a real, stocked lot (historical,
+    // already-released movements intentionally reference synthetic lot ids —
+    // they're aggregate-only impact history, never looked up against the
+    // live shelf).
+    for (const m of open) {
       for (const line of m.lines) {
         const l = seed.lots.find((x) => x.id === line.lotId);
         expect(l).toBeDefined();
         expect(l!.quantity).toBeGreaterThanOrEqual(line.quantity);
       }
     }
-    // assignees and recipients resolve
+    // assignees and recipients resolve, across ALL movements (open + historical)
     for (const m of seed.movements) {
       if (m.assigneeId) expect(seed.team.some((t) => t.id === m.assigneeId)).toBe(true);
       if (m.recipientId) expect(seed.partners.some((p) => p.id === m.recipientId)).toBe(true);

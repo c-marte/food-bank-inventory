@@ -68,7 +68,7 @@ function freshState(today: ISODate): StoreState {
     deliveries: seed.deliveries,
     partners: seed.partners,
     team: seed.team,
-    wasteEvents: [],
+    wasteEvents: seed.wasteEvents,
     config: seed.config,
     today,
     lastReminder: null,

@@ -10,6 +10,7 @@ import type {
   PerishTier,
   TeamMember,
   TransportMode,
+  WasteEvent,
 } from '../domain/types';
 import { DEFAULT_CONFIG } from '../domain/config';
 import { inferTier } from '../domain/tier';
@@ -142,12 +143,76 @@ const SEED_DELIVERIES: SeedDelivery[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// Historical activity — for the Impact section only (30-day / YTD stats).
+// These are ALREADY-RELEASED movements and ALREADY-RECEIVED deliveries dated
+// in the past relative to `today`, so the gratitude numbers aren't zero on
+// first load. They deliberately reference synthetic lot ids (never looked up
+// anywhere — only counted in aggregate by domain/impact.ts) since the real
+// current shelf state doesn't need to reconcile against bygone activity.
+// ---------------------------------------------------------------------------
+
+interface SeedHistoricalRelease {
+  id: string;
+  recipientId: string; // one of SEED_PARTNERS
+  releasedDaysAgo: number;
+  createdDaysAgo: number;
+  units: number;
+  note: string;
+}
+
+// prettier-ignore
+const SEED_HISTORICAL_RELEASES: SeedHistoricalRelease[] = [
+  // last 30 days — 3 to shelters, 3 to families
+  { id: 'hist-rel-1', recipientId: 'partner-1', releasedDaysAgo: 2,  createdDaysAgo: 3,  units: 5, note: 'weekly order' },
+  { id: 'hist-rel-2', recipientId: 'partner-3', releasedDaysAgo: 5,  createdDaysAgo: 5,  units: 3, note: 'family box' },
+  { id: 'hist-rel-3', recipientId: 'partner-2', releasedDaysAgo: 9,  createdDaysAgo: 10, units: 8, note: 'weekly order' },
+  { id: 'hist-rel-4', recipientId: 'partner-4', releasedDaysAgo: 14, createdDaysAgo: 14, units: 2, note: 'family box' },
+  { id: 'hist-rel-5', recipientId: 'partner-1', releasedDaysAgo: 20, createdDaysAgo: 21, units: 6, note: 'weekly order' },
+  { id: 'hist-rel-6', recipientId: 'partner-3', releasedDaysAgo: 27, createdDaysAgo: 27, units: 4, note: 'family box' },
+  // 30-90 days ago (YTD only)
+  { id: 'hist-rel-7', recipientId: 'partner-2', releasedDaysAgo: 45,  createdDaysAgo: 46,  units: 7,  note: 'weekly order' },
+  { id: 'hist-rel-8', recipientId: 'partner-4', releasedDaysAgo: 80,  createdDaysAgo: 80,  units: 3,  note: 'family box' },
+  { id: 'hist-rel-9', recipientId: 'partner-1', releasedDaysAgo: 130, createdDaysAgo: 131, units: 10, note: 'weekly order' },
+  { id: 'hist-rel-10', recipientId: 'partner-3', releasedDaysAgo: 170, createdDaysAgo: 170, units: 2,  note: 'family box' },
+];
+
+interface SeedHistoricalDelivery {
+  id: string;
+  donorName: string;
+  receivedDaysAgo: number;
+}
+
+// prettier-ignore
+const SEED_HISTORICAL_DELIVERIES: SeedHistoricalDelivery[] = [
+  { id: 'hist-del-1', donorName: "Trader Joe's",       receivedDaysAgo: 3 },
+  { id: 'hist-del-2', donorName: 'Whole Foods Market',  receivedDaysAgo: 11 },
+  { id: 'hist-del-3', donorName: "Sal's Catering",      receivedDaysAgo: 22 },
+  { id: 'hist-del-4', donorName: 'Community Bake Sale', receivedDaysAgo: 60 },
+  { id: 'hist-del-5', donorName: "Trader Joe's",        receivedDaysAgo: 150 }, // repeat donor — tests distinct-count dedup
+];
+
+interface SeedHistoricalWaste {
+  id: string;
+  lotName: string;
+  quantity: number;
+  daysAgo: number;
+}
+
+// prettier-ignore
+const SEED_HISTORICAL_WASTE: SeedHistoricalWaste[] = [
+  { id: 'hist-waste-1', lotName: 'Sliced Bread', quantity: 2, daysAgo: 6 },
+  { id: 'hist-waste-2', lotName: 'Bagged Salad', quantity: 1, daysAgo: 19 },
+  { id: 'hist-waste-3', lotName: 'Sliced Bread', quantity: 3, daysAgo: 50 },
+];
+
 export interface SeedData {
   lots: InventoryLot[];
   partners: Partner[];
   team: TeamMember[];
   movements: OutboundMovement[];
   deliveries: Delivery[];
+  wasteEvents: WasteEvent[];
   config: Config;
 }
 
@@ -238,12 +303,51 @@ export function buildSeed(today: ISODate): SeedData {
     })),
   }));
 
+  // Historical activity, for the Impact section's 30-day / YTD stats only —
+  // already released / already received, so it never touches the live shelf.
+  const historicalReleases: OutboundMovement[] = SEED_HISTORICAL_RELEASES.map(
+    (h, i) => ({
+      id: h.id,
+      lines: [{ lotId: `hist-lot-${i + 1}`, quantity: h.units, released: h.units }],
+      packed: true,
+      recipientId: h.recipientId,
+      mode: 'we_go',
+      note: h.note,
+      status: 'released',
+      createdDate: addDays(today, -h.createdDaysAgo),
+      releasedDate: addDays(today, -h.releasedDaysAgo),
+    }),
+  );
+
+  const historicalDeliveries: Delivery[] = SEED_HISTORICAL_DELIVERIES.map(
+    (h) => ({
+      id: h.id,
+      donorName: h.donorName,
+      kind: 'individual',
+      status: 'received',
+      expectedDate: addDays(today, -h.receivedDaysAgo),
+      receivedDate: addDays(today, -h.receivedDaysAgo),
+      mode: 'they_come',
+      items: [],
+    }),
+  );
+
+  const wasteEvents: WasteEvent[] = SEED_HISTORICAL_WASTE.map((h) => ({
+    id: h.id,
+    lotId: `hist-lot-waste-${h.id}`,
+    lotName: h.lotName,
+    unit: 'units',
+    quantity: h.quantity,
+    date: addDays(today, -h.daysAgo),
+  }));
+
   return {
     lots,
     partners: SEED_PARTNERS,
     team: SEED_TEAM,
-    movements,
-    deliveries,
+    movements: [...movements, ...historicalReleases],
+    deliveries: [...deliveries, ...historicalDeliveries],
+    wasteEvents,
     config: DEFAULT_CONFIG,
   };
 }

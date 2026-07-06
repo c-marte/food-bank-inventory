@@ -137,6 +137,10 @@ export interface Delivery {
   kind: DeliveryKind;
   status: 'expected' | 'received';
   expectedDate: ISODate;
+  /** Set when the dock actually receives it (rule 1's commit point) — distinct
+   *  from expectedDate, the same way a movement's releasedDate is distinct
+   *  from createdDate. Used for real donor/impact accounting. */
+  receivedDate?: ISODate;
   /** they_come — the donor drops off at our dock; we_go — one of ours drives
    *  out to collect (catering surplus is almost always a we_go trip). */
   mode: TransportMode;
