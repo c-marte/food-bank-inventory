@@ -1,15 +1,175 @@
+import { AnimatePresence, motion } from 'motion/react';
+import type { Delivery, PerishTier } from '../domain/types';
+import { Icon, TierMark } from '../ui/primitives';
+import { TIER_META } from '../ui/format';
 import { cn } from '../ui/cn';
+import { SPRING } from '../ui/motion';
 
 /* ─────────────────────────────────────────────────────────
- * Food Out's visual anchor. Food In's used to live here too (a stylized,
- * non-live illustration), but it's now DeliveryTrackerMap.tsx — a real,
- * interactive Leaflet map, since Food In is where this build's remaining
- * polish is going. Food Out deliberately keeps its simpler treatment: no
- * real multi-stage fulfillment pipeline exists to track (a movement is
- * pending, then released — that's the whole state machine), so the status
- * board stays an AGGREGATE of today's real, independent counts, not a
- * fabricated per-item journey.
+ * Shared parts used by both FoodInPanel and FoodOutPanel — the two panels
+ * are no longer mirrored tiles in one row (Food In went full-width), but
+ * they still share a visual language: the clickable title-header, the
+ * number+label KPI block (as a tab or static), the fixed-height metadata
+ * row, and the delivery cross-check list. Food Out's visual anchor (the
+ * Pack → Match → Handoff connector) also lives here. Food In's used to
+ * (a stylized, non-live illustration), but it's now DeliveryTrackerMap.tsx —
+ * a real, interactive Leaflet map, since Food In is where this build's
+ * remaining polish is going. Food Out deliberately keeps its simpler
+ * treatment: no real multi-stage fulfillment pipeline exists to track (a
+ * movement is pending, then released — that's the whole state machine), so
+ * the status board stays an AGGREGATE of today's real, independent counts,
+ * not a fabricated per-item journey.
  * ───────────────────────────────────────────────────────── */
+
+/** Both panels reserve enough room for the tallest metadata case (Food In's
+ *  delivery selection, which adds a cross-check item list), so the row never
+ *  changes height as its content changes. */
+export const METADATA_MIN_H = 'min-h-14';
+
+export function timingLabel(daysAway: number): string {
+  if (daysAway <= 0) return 'today';
+  if (daysAway === 1) return 'tomorrow';
+  return `in ${daysAway} days`;
+}
+
+/** A panel's title, itself the click-through to its full surface (Intake /
+ *  Distribution) — one affordance instead of a separate "View X" link. */
+export function TileHeader({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: 'truck' | 'arrow';
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="group eyebrow -m-1 flex items-center gap-1.5 self-start rounded-md p-1 text-[11px] font-bold text-zinc-400 transition-colors hover:bg-zinc-50 hover:text-zinc-700"
+    >
+      <Icon name={icon} size={13} />
+      {label}
+      <Icon
+        name="chevron"
+        size={11}
+        className="text-zinc-300 opacity-0 transition-opacity group-hover:opacity-100"
+      />
+    </button>
+  );
+}
+
+/** Every KPI number: same size everywhere, always plain black. Color is
+ *  reserved for status elsewhere (tier marks, the Act-first headline) — not
+ *  for a panel's hero count. */
+export function Count({ n }: { n: number }) {
+  return (
+    <span className="relative inline-flex h-9 min-w-[2rem] items-center justify-start">
+      <AnimatePresence mode="popLayout" initial={false}>
+        <motion.span
+          key={n}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={SPRING.pop}
+          className="nums text-2xl font-bold text-zinc-950"
+        >
+          {n}
+        </motion.span>
+      </AnimatePresence>
+    </span>
+  );
+}
+
+/** A clickable KPI metric — Food In's Pickup/Delivery parent toggle. Active =
+ *  the tab driving the metadata + map below; inactive invites the click. */
+export function MetricTab({
+  active,
+  n,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  n: number;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        'flex-1 min-w-0 rounded-lg px-2.5 py-1.5 text-left transition-colors',
+        active
+          ? 'bg-zinc-50 ring-1 ring-zinc-950'
+          : 'opacity-50 hover:bg-zinc-50 hover:opacity-100',
+      )}
+    >
+      <Count n={n} />
+      <div className="truncate text-xs text-zinc-500">{label}</div>
+    </button>
+  );
+}
+
+/** Food Out's KPI block — same box/typography as MetricTab, but static (not a
+ *  tab) and always plain black: no urgency color on the large number. */
+export function KpiBlock({ n, label }: { n: number; label: string }) {
+  return (
+    <div className="flex-1 min-w-0 rounded-lg px-2.5 py-1.5 text-left">
+      <Count n={n} />
+      <div className="truncate text-xs text-zinc-500">{label}</div>
+    </div>
+  );
+}
+
+/** The delivery's manifest, so the receiver can cross-check what arrives
+ *  against what was promised. */
+export function CrossCheckItems({ delivery }: { delivery: Delivery }) {
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-zinc-500">
+      {delivery.items.map((it, i) => (
+        <span key={it.id} className="nums inline-flex items-center gap-1">
+          {i > 0 && <span className="text-zinc-300">·</span>}
+          <TierMark tier={it.tier} size={11} />
+          {it.quantity} {it.name}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** A small selectable pill for choosing WHICH item within an active category
+ *  (e.g. which of two scheduled pickups) — reuses the tier mark so a glance
+ *  still shows handling class even at this compact size. */
+export function ItemChip({
+  tier,
+  label,
+  selected,
+  onClick,
+}: {
+  tier: PerishTier;
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={selected}
+      className={cn(
+        'flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
+        selected
+          ? 'border-zinc-950 bg-zinc-950 text-white'
+          : 'border-zinc-300 text-zinc-600 hover:border-zinc-500',
+      )}
+    >
+      <span className={selected ? 'text-white' : 'text-zinc-500'}>
+        <Icon name={TIER_META[tier].iconKey} size={11} />
+      </span>
+      <span className="truncate">{label}</span>
+    </button>
+  );
+}
 
 const NODE_TONE: Record<'urgent' | 'normal' | 'calm', { dot: string }> = {
   urgent: { dot: 'bg-red-500' },

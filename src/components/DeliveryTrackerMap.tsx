@@ -23,8 +23,14 @@ import { cn } from '../ui/cn';
  * calendar dates, never clock times — this app tracks days, not hours.
  * ───────────────────────────────────────────────────────── */
 
-const OSM_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+// CARTO's "Positron" basemap — a muted, keyless, freely-attributed tile set:
+// white streets, gray/beige blocks for buildings, green parks, blue water.
+// Chosen specifically to mute the default OSM basemap's busy road-color-coding
+// down to the calm, low-saturation look real tracking UIs (Seamless, DoorDash)
+// use, without needing a paid Mapbox-style key.
+const BASEMAP_URL = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+const BASEMAP_ATTRIBUTION =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
 
 function pinDivIcon(kind: 'donor' | 'dock'): L.DivIcon {
   const bg = kind === 'donor' ? '#09090b' : '#ffffff';
@@ -75,10 +81,7 @@ export function DeliveryTrackerMap({
           scrollWheelZoom={false}
           className="h-full w-full"
         >
-          <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution={OSM_ATTRIBUTION}
-          />
+          <TileLayer url={BASEMAP_URL} attribution={BASEMAP_ATTRIBUTION} />
           <Polyline
             positions={[donorLoc, DOCK_LOCATION]}
             pathOptions={{ color: '#3f3f46', weight: 2, dashArray: '5 6', opacity: 0.7 }}

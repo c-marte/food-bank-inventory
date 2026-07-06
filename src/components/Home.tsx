@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { TriageBar } from './TriageBar';
-import { FlowTiles } from './FlowTiles';
+import { FoodInPanel } from './FoodInPanel';
+import { FoodOutPanel } from './FoodOutPanel';
 import { DecayTimeline } from './DecayTimeline';
 import { MoveFirstZone } from './MoveFirstZone';
 import { LowStockZone } from './LowStockZone';
@@ -10,16 +11,22 @@ import { Icon } from '../ui/primitives';
 import { cn } from '../ui/cn';
 import { SPRING } from '../ui/motion';
 
-/** Shelf home: one urgent headline (Act first), then the two-tile summary —
- *  Food In / Food Out — each self-contained with its own action. The rich
- *  status (timeline + zones) is one tap away behind "View the full shelf". */
+/** Shelf home: one urgent headline (Act first), then Food In full-width with
+ *  its real map, then Inventory-soon-to-expire beside Food Out. The rest of
+ *  the rich status (Move first, Low stock) is one tap away behind "View the
+ *  full shelf". */
 export function Home() {
   const [showShelf, setShowShelf] = useState(false);
 
   return (
     <div className="space-y-4">
       <TriageBar />
-      <FlowTiles />
+      <FoodInPanel />
+
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <DecayTimeline />
+        <FoodOutPanel />
+      </div>
 
       {/* The full picture, on demand. */}
       <div>
@@ -31,7 +38,7 @@ export function Home() {
           <span className="inline-flex items-center gap-2">
             <Icon name="clock" size={16} className="text-zinc-400" />
             View the full shelf
-            <span className="text-zinc-400">— timeline, what's dying, low stock</span>
+            <span className="text-zinc-400">— low stock, category breakdown</span>
           </span>
           <span
             className={cn(
@@ -52,12 +59,9 @@ export function Home() {
               transition={SPRING.reflow}
               style={{ overflow: 'hidden' }}
             >
-              <div className="space-y-4 pt-4">
-                <DecayTimeline />
-                <div className="grid items-start gap-4 md:grid-cols-2">
-                  <MoveFirstZone />
-                  <LowStockZone />
-                </div>
+              <div className="grid items-start gap-4 pt-4 md:grid-cols-2">
+                <MoveFirstZone />
+                <LowStockZone />
               </div>
             </motion.div>
           )}

@@ -88,7 +88,7 @@ export function DecayTimeline() {
           </div>
         }
       >
-        Decay timeline
+        Inventory soon to expire
       </SectionHeader>
 
       {total === 0 ? (

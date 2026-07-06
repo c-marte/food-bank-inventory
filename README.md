@@ -110,69 +110,73 @@ match destination count). "Pickup" was **retired** — it's directionally
 ambiguous (a volunteer picks up *from* a vendor = intake; a partner picks up =
 distribution).
 
-- **Shelf** (`Home`) — one urgent headline, then a **two-tile summary**
-  (`FlowTiles`): **Food In** / **Food Out**, side by side, **mirrored row for
-  row** so the two cards read as one language: header, KPI, metadata, visual
-  anchor, footer — same structure, same typography, on both sides. `TriageBar`
-  stays headline-only — one elevated fact ("Baby Spinach expires today"), no
-  repeated counts, since those live on the tiles. The rich status — the
-  **decay timeline**, **Move first**, **Low stock** — is one tap away behind
-  **"View the full shelf"** (reference, not the daily driver).
+- **Shelf** (`Home`) — one urgent headline, then **Food In full-width**
+  (`FoodInPanel`), then **Inventory soon to expire** beside **Food Out**
+  (`DecayTimeline` + `FoodOutPanel`), then the collapsed **"View the full
+  shelf"** drawer (Move first, Low stock — reference, not the daily driver).
+  `TriageBar` stays headline-only — one elevated fact ("Baby Spinach expires
+  today"), no repeated counts, since those live on the panels below.
 
-  - **Header** — the tile's title (`TileHeader`) is itself the click-through:
-    hovering "Food in" / "Food out" reveals a chevron and a hover state, and
-    clicking navigates to Intake / Distribution. Replaces a separate "View
-    intake" / "View distribution" link — one affordance instead of two.
-  - **KPI row** — 2 (Food In) or 3 (Food Out) equal-size number+label blocks,
-    identical typography (`Count`, always plain black — no urgency color on a
-    tile's hero number; color is reserved for status elsewhere, like tier
-    marks). Food In's are **tabs** (`MetricTab`): **pickups (we go)** vs.
-    **deliveries**, never lumped (a delivery is the donor coming to us; a
-    pickup is one of ours driving out — same "expected" status, opposite
-    direction), and clicking one swaps the metadata + map below it. Pickup is
-    the default. Food Out's are static (`KpiBlock`) — Pack / Match / Handoff —
-    the same counts that used to live inside the visual anchor, promoted up so
-    both tiles' KPI rows match in structure and height.
-  - **Metadata** — a fixed-height row (`min-h-14`) on both tiles, sized for the
-    tallest case (Food In's delivery tab, which adds a **cross-check item
-    list** — `CrossCheckItems`: "12 Wheat Bread · 15 Bananas · 6 Whole Milk" —
-    so the receiver can verify what arrives against what was promised, and
-    deliberately **no avatar**, since anyone can receive a delivery; only a
-    pickup has one specific person who has to go get it, so pickup keeps its
-    `TeamBadge`). Fixed height means neither tile's metadata row changes size
-    as its content changes, keeping the rows mirrored underneath it too.
-  - **Visual anchor** — `flex-1`, so it absorbs whatever height difference is
-    left once the rows above it are equal, and both tiles end up the same
-    overall height automatically (no manual height math). Food Out:
-    `OutboundStatusBoard`, the **Pack → Match → Handoff connector**
-    (dot-line-dot, owner names underneath) — the counts live in the KPI row
-    above, so nothing is shown twice. A literal 4-node per-item tracker
-    (Selected → Packed → Ready → Released) was considered and rejected first:
-    our domain only has two real states per record (pending, released), so a
-    4-stage per-item stepper would have invented progress that didn't exist —
-    the real Pack/Match/Handoff pipeline (below) resolved that honestly
-    instead of faking it. Food In: `DeliveryTrackerMap` — a **real, interactive
-    Leaflet + OpenStreetMap map** (draggable, zoomable, no API key — the same
-    no-key approach a production app like Shopee credits on its own tracking
-    screen) with a **3-stage derived stepper** above it (`getDeliveryStage`:
-    Scheduled → En route → Received, from `expectedDate` vs. `today` and
-    `status` — never stored, same house rule as the Pack/Match/Handoff
-    pipeline). Two honest, static pins (the donor, our dock — seeded
-    coordinates in `data/geo.ts`) joined by a straight dashed connector,
-    **explicitly not a routed path or a live courier position** — we have no
-    real-time GPS, so a moving vehicle icon would be a lie the interface
-    tells. Captions are calendar dates ("Expected Jul 6"), never clock times —
-    this app tracks days, not hours, by design from the very first commit.
-  - **Hover-driven width** — hovering the Food In map (not the whole tile)
-    grows its grid column (`grid-cols-[var(--in-fr)_var(--out-fr)]`, CSS
-    variables driven by hover state, transitioned); Food Out narrows and
-    gracefully truncates/wraps-and-clips (`overflow-hidden` on the fixed-height
-    metadata row, `truncate` on KPI labels) rather than changing height —
-    plain CSS responding to whatever width the grid actually gives it, no
-    prop-drilled "compact" state needed. Modeled on the list-widens-map-narrows
-    attention pattern in map+list split views (Walmart, Tripadvisor, OpenTable
-    all use the family; the specific hover-to-grow micro-interaction is this
-    build's own refinement of it).
+  This replaced an earlier **two-tile, mirrored-row** layout (Food In / Food
+  Out side by side, identical structure on both sides) after a deliberate
+  Google-Maps-style rework: **Food In went full-width** with information on
+  the left and a real map on the right (à la Google's Places-results split),
+  because the map deserved more room than a mirrored tile could give it. The
+  **hover-driven width swap** between the two tiles (hovering the map grew
+  Food In's column, Food Out gracefully truncated) is now **retired** — it
+  solved a problem (two competing tiles fighting over shared width) that no
+  longer exists once Food In is simply full-width by default.
+
+  - **`FoodInPanel`** — one card, `items-stretch` internal grid (`lg:grid-cols-5`,
+    left `col-span-2` / right `col-span-3`), so the map's height always
+    matches the left column's — the map got taller not by a magic number, but
+    because it's no longer squeezed into a leftover `flex-1` sliver at the
+    bottom of a stack; it *is* the right column now.
+    - **Left** — a **two-level selector**: a parent toggle (`MetricTab`) —
+      **pickups (we go)** vs. **deliveries**, never lumped (a delivery is the
+      donor coming to us; a pickup is one of ours driving out — same
+      "expected" status, opposite direction; pickup is the default) — and,
+      only when the active category has more than one item, a row of
+      **item chips** (`ItemChip`, tier-marked with the trip's most-urgent
+      handling class) to pick *which* scheduled pickup/delivery the metadata
+      and map are currently showing. Below that: a fixed-height metadata row
+      (`CrossCheckItems` on the delivery side so the receiver can verify what
+      arrives against what was promised, deliberately no avatar there since
+      anyone can receive a delivery — only a pickup has one specific person
+      who has to go get it, so pickup keeps its `TeamBadge`); a `Receive`
+      button pinned to the bottom of the column (`mt-auto`).
+    - **Right** — `DeliveryTrackerMap`: a **real, interactive Leaflet map**
+      (draggable, zoomable, no API key) on **CARTO's "Positron" basemap** —
+      muted on purpose (white streets, gray/beige blocks, green parks, blue
+      water) instead of the default OSM basemap's busy road-color-coding,
+      matching the calm look real tracking UIs (Seamless, DoorDash) use — with
+      a **3-stage derived stepper** above it (`getDeliveryStage`: Scheduled →
+      En route → Received, from `expectedDate` vs. `today` and `status` —
+      never stored, same house rule as the Pack/Match/Handoff pipeline). Two
+      honest, static pins (the donor, our dock — seeded coordinates in
+      `data/geo.ts`) joined by a straight dashed connector, **explicitly not a
+      routed path or a live courier position** — we have no real-time GPS, so
+      a moving vehicle icon would be a lie the interface tells. Captions are
+      calendar dates ("Expected Jul 6"), never clock times — this app tracks
+      days, not hours, by design from the very first commit.
+  - **`FoodOutPanel`** — unchanged content (KPI blocks, metadata,
+    `OutboundStatusBoard`'s Pack → Match → Handoff connector), now paired with
+    **Inventory soon to expire** instead of Food In. A literal 4-node per-item
+    tracker (Selected → Packed → Ready → Released) was considered and rejected
+    for this panel earlier: our domain only has two real states per record
+    (pending, released), so a 4-stage per-item stepper would have invented
+    progress that didn't exist — the real Pack/Match/Handoff pipeline resolved
+    that honestly instead of faking it.
+  - **`DecayTimeline`** (labeled **"Inventory soon to expire"** in the UI —
+    same component, same fan-out interaction, renamed only because "decay
+    timeline" is an internal/engineering term) — promoted out of the
+    collapsed drawer into an always-visible position beside Food Out, since
+    it's the signal for *what to move or find a partner for*, which is
+    exactly Food Out's job.
+  - **`TileHeader`, `Count`, `MetricTab`, `KpiBlock`, `CrossCheckItems`,
+    `ItemChip`** — shared visual language extracted into `FlowTileVisuals.tsx`
+    so `FoodInPanel` and `FoodOutPanel` (independent components now, not one
+    mirrored pair) still read as one design system.
 - **Intake** (`IntakePage`) — food IN, split the same way as the tile:
   **Deliveries** and **Our pickups** as two labeled lists (`IncomingDeliveries`),
   each row showing the assigned team member's avatar. The two capture paths
