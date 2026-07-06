@@ -4,7 +4,7 @@ import { daysUntil } from '../domain/dates';
 import { getExpiringZoneLots } from '../domain/dashboard';
 import { useStore } from '../store/useStore';
 import { useUI } from '../store/useUI';
-import { Card, EmptyCard, Icon, SectionHeader } from '../ui/primitives';
+import { Card, EmptyCard, Icon, SectionHeader, TierMark } from '../ui/primitives';
 import { cn } from '../ui/cn';
 import { SPRING } from '../ui/motion';
 
@@ -135,6 +135,7 @@ function ZoneRow({
       className="group -mx-1.5 flex w-[calc(100%+0.75rem)] items-center gap-3 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950"
       aria-label={`${lot.name} — ${lot.quantity} ${lot.unit}, ${days} days left. Open actions.`}
     >
+      <TierMark tier={lot.tier} size={14} />
       <span className="min-w-0 flex-1 truncate font-medium text-zinc-950">
         {lot.name}
       </span>

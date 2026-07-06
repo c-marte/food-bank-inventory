@@ -4,9 +4,8 @@ import { daysUntil, relativeDayLabel } from '../domain/dates';
 import { getLotStatus } from '../domain/status';
 import { useStore } from '../store/useStore';
 import { Sheet } from '../ui/Sheet';
-import { Button, Icon, StatusBadge, Stepper } from '../ui/primitives';
+import { Button, Icon, StatusBadge, Stepper, TierChip, TierMark } from '../ui/primitives';
 import { fullDateLabel } from '../ui/format';
-import { foodEmoji } from '../ui/foodEmoji';
 import { CATEGORY_LABELS } from '../domain/types';
 import { cn } from '../ui/cn';
 import { SPRING } from '../ui/motion';
@@ -63,12 +62,11 @@ export function LotActionSheet({
       <div className="space-y-5">
         {/* Identity block */}
         <div className="flex items-center gap-3">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-zinc-50 text-2xl ring-1 ring-zinc-200">
-            {foodEmoji(lot.name)}
-          </span>
+          <TierChip tier={lot.tier} size={48} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge status={status} />
+              <TierMark tier={lot.tier} showLabel />
               <span className="eyebrow text-[10px] font-bold text-zinc-400">
                 {CATEGORY_LABELS[lot.category]}
               </span>

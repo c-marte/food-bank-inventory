@@ -1,5 +1,21 @@
-import type { LotStatus } from '../domain/types';
+import type { LotStatus, PerishTier } from '../domain/types';
 import { parseLocalDate } from '../domain/dates';
+
+/** Tier display metadata. Shape (icon) carries the handling class; color is
+ *  reserved for STATUS, so tiers stay monochrome and never collide with the
+ *  red/amber/green urgency system. */
+export interface TierMeta {
+  short: string;
+  label: string;
+  iconKey: 'flame' | 'snowflake' | 'box';
+  order: number;
+}
+
+export const TIER_META: Record<PerishTier, TierMeta> = {
+  prepared: { short: 'EAT NOW', label: 'Eat now', iconKey: 'flame', order: 0 },
+  fresh: { short: 'KEEP COLD', label: 'Keep cold', iconKey: 'snowflake', order: 1 },
+  shelf_stable: { short: 'SHELF', label: 'Shelf-stable', iconKey: 'box', order: 2 },
+};
 
 /** Dense clock label for a day-count column: TODAY, +1d, -2d. */
 export function shortDayLabel(days: number): string {

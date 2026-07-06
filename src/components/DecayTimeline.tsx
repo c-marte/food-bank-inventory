@@ -1,12 +1,11 @@
 import { useMemo, useState } from 'react';
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 import type { InventoryLot } from '../domain/types';
-import { CATEGORY_LABELS } from '../domain/types';
 import { addDays, daysUntil, parseLocalDate } from '../domain/dates';
 import { useStore } from '../store/useStore';
 import { useUI } from '../store/useUI';
 import { Card, EmptyCard, Icon, SectionHeader } from '../ui/primitives';
-import { foodEmoji } from '../ui/foodEmoji';
+import { TIER_META } from '../ui/format';
 import { cn } from '../ui/cn';
 import { SPRING } from '../ui/motion';
 
@@ -227,7 +226,7 @@ function DayPile({
                 key={lot.id}
                 layoutId={`chip-${lot.id}`}
                 className={cn(
-                  'absolute left-1/2 bottom-0 flex h-8 w-8 items-center justify-center rounded-full bg-white text-lg shadow-sm ring-1',
+                  'absolute left-1/2 bottom-0 flex h-8 w-8 items-center justify-center rounded-full bg-white text-zinc-600 shadow-sm ring-1',
                   urgent ? 'ring-red-200' : 'ring-zinc-200',
                 )}
                 style={{ zIndex: i }}
@@ -238,7 +237,7 @@ function DayPile({
                 }}
                 transition={SPRING.reflow}
               >
-                {foodEmoji(lot.name)}
+                <Icon name={TIER_META[lot.tier].iconKey} size={16} />
               </motion.span>
             );
           })}
@@ -286,18 +285,18 @@ function DayPile({
                     <motion.span
                       layoutId={`chip-${lot.id}`}
                       className={cn(
-                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-lg shadow-sm ring-1',
+                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-zinc-600 shadow-sm ring-1',
                         urgent ? 'ring-red-200' : 'ring-zinc-200',
                       )}
                     >
-                      {foodEmoji(lot.name)}
+                      <Icon name={TIER_META[lot.tier].iconKey} size={16} />
                     </motion.span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium text-zinc-950">
                         {lot.name}
                       </span>
                       <span className="nums block text-[11px] text-zinc-500">
-                        {lot.quantity} {lot.unit} · {CATEGORY_LABELS[lot.category]}
+                        {lot.quantity} {lot.unit} · {TIER_META[lot.tier].label}
                       </span>
                     </span>
                     <Icon

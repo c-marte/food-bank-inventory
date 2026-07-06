@@ -3,8 +3,7 @@ import type { Delivery } from '../domain/types';
 import { daysUntil } from '../domain/dates';
 import { useStore } from '../store/useStore';
 import { useUI } from '../store/useUI';
-import { Button, Card, Icon, SectionHeader } from '../ui/primitives';
-import { foodEmoji } from '../ui/foodEmoji';
+import { Button, Card, Icon, SectionHeader, TierMark } from '../ui/primitives';
 import { cn } from '../ui/cn';
 import { SPRING } from '../ui/motion';
 
@@ -40,7 +39,9 @@ export function IncomingDeliveries() {
           </button>
         }
       >
-        Incoming deliveries
+        <span className="inline-flex items-center gap-1.5">
+          <Icon name="truck" size={14} className="text-zinc-400" /> Incoming deliveries
+        </span>
       </SectionHeader>
 
       <ul className="mt-3 space-y-2.5">
@@ -104,9 +105,10 @@ function DeliveryRow({
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-zinc-600">
-        {delivery.items.map((it) => (
-          <span key={it.id} className="nums inline-flex items-center gap-1">
-            <span className="text-base leading-none">{foodEmoji(it.name)}</span>
+        {delivery.items.map((it, i) => (
+          <span key={it.id} className="nums inline-flex items-center gap-1.5">
+            {i > 0 && <span className="text-zinc-300">·</span>}
+            <TierMark tier={it.tier} size={12} />
             {it.quantity} {it.name}
           </span>
         ))}

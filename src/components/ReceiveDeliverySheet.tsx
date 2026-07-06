@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
-import type { Category, DeliveryItem } from '../domain/types';
-import { CATEGORIES, CATEGORY_LABELS } from '../domain/types';
+import type { Category, DeliveryItem, PerishTier } from '../domain/types';
+import { CATEGORIES, CATEGORY_LABELS, TIERS, TIER_LABELS } from '../domain/types';
 import { makeDeliveryItem } from '../domain/deliveries';
 import { useStore } from '../store/useStore';
 import { Sheet } from '../ui/Sheet';
-import { Button, Icon, Stepper, inputClass } from '../ui/primitives';
-import { foodEmoji } from '../ui/foodEmoji';
+import { Button, Icon, Stepper, TierChip, inputClass } from '../ui/primitives';
 import { weekdayDateLabel } from '../ui/format';
 import { cn } from '../ui/cn';
 
@@ -87,9 +86,7 @@ export function ReceiveDeliverySheet({
           {items.map((it) => (
             <li key={it.id} className="rounded-xl border border-zinc-200 p-3">
               <div className="flex items-center gap-2">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-50 text-lg ring-1 ring-zinc-200">
-                  {foodEmoji(it.name)}
-                </span>
+                <TierChip tier={it.tier} size={32} />
                 <input
                   value={it.name}
                   onChange={(e) => patch(it.id, { name: e.target.value })}
@@ -134,6 +131,19 @@ export function ReceiveDeliverySheet({
                     />
                   )}
                 </GuessWrap>
+
+                <select
+                  value={it.tier}
+                  onChange={(e) => patch(it.id, { tier: e.target.value as PerishTier })}
+                  aria-label="Handling"
+                  className="h-9 rounded-md border border-zinc-300 bg-white px-2 text-sm text-zinc-800 outline-none focus:border-zinc-950"
+                >
+                  {TIERS.map((t) => (
+                    <option key={t} value={t}>
+                      {TIER_LABELS[t]}
+                    </option>
+                  ))}
+                </select>
 
                 <Stepper
                   size="sm"

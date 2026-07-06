@@ -5,7 +5,7 @@ import { daysUntil } from '../domain/dates';
 import { getLotStatus } from '../domain/status';
 import { useStore } from '../store/useStore';
 import { useUI } from '../store/useUI';
-import { Card, Icon, SectionHeader, StatusBadge } from '../ui/primitives';
+import { Card, Icon, SectionHeader, StatusBadge, TierMark } from '../ui/primitives';
 import { STATUS_META, fullDateLabel, shortDayLabel } from '../ui/format';
 import { cn } from '../ui/cn';
 
@@ -219,6 +219,7 @@ function LotRow({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <StatusBadge status={status} />
+            <TierMark tier={lot.tier} size={13} />
             <span className="nums text-[13px] text-zinc-500">
               exp {fullDateLabel(lot.expiryDate)}
               <span className={cn('ml-1.5 font-semibold', STATUS_META[status].text)}>

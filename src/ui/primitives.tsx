@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
-import type { LotStatus } from '../domain/types';
-import { STATUS_META, type IconKey } from './format';
+import type { LotStatus, PerishTier } from '../domain/types';
+import { STATUS_META, TIER_META, type IconKey } from './format';
 import { cn } from './cn';
 
 // ---------------------------------------------------------------------------
@@ -18,7 +18,11 @@ const ICON_PATHS: Record<
   | 'inbox'
   | 'clock'
   | 'mic'
-  | 'camera',
+  | 'camera'
+  | 'flame'
+  | 'snowflake'
+  | 'box'
+  | 'truck',
   ReactNode
 > = {
   check: <path d="M20 6 9 17l-5-5" />,
@@ -70,6 +74,30 @@ const ICON_PATHS: Record<
     <>
       <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
       <circle cx="12" cy="13" r="3.5" />
+    </>
+  ),
+  // Tier marks — shape carries the handling class (color reserved for status).
+  flame: (
+    <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+  ),
+  snowflake: (
+    <>
+      <path d="M2 12h20M12 2v20" />
+      <path d="m4.93 4.93 14.14 14.14M19.07 4.93 4.93 19.07" />
+    </>
+  ),
+  box: (
+    <>
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+      <path d="m3.3 7 8.7 5 8.7-5M12 22V12" />
+    </>
+  ),
+  truck: (
+    <>
+      <path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2" />
+      <path d="M15 18H9M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14" />
+      <circle cx="7" cy="18" r="2" />
+      <circle cx="17" cy="18" r="2" />
     </>
   ),
 };
@@ -130,6 +158,51 @@ export function StatusBar({ status }: { status: LotStatus }) {
       className={cn('w-1 shrink-0 self-stretch rounded-full', STATUS_META[status].bar)}
       aria-hidden="true"
     />
+  );
+}
+
+/** Handling-class mark: a shape (not a color) plus an optional label. The one
+ *  per-item visual asset that's job-critical — how to store it, how fast to
+ *  move it. Prepared reads slightly heavier since it's the urgent tier. */
+export function TierMark({
+  tier,
+  showLabel = false,
+  size = 13,
+  className,
+}: {
+  tier: PerishTier;
+  showLabel?: boolean;
+  size?: number;
+  className?: string;
+}) {
+  const m = TIER_META[tier];
+  const tone = tier === 'shelf_stable' ? 'text-zinc-400' : 'text-zinc-600';
+  return (
+    <span
+      className={cn('inline-flex shrink-0 items-center gap-1', tone, className)}
+      title={m.label}
+    >
+      <Icon name={m.iconKey} size={size} />
+      {showLabel && (
+        <span className="eyebrow text-[10px] font-bold tracking-wide">{m.short}</span>
+      )}
+    </span>
+  );
+}
+
+/** Tier mark inside a neutral circle — the marker used on the timeline and as a
+ *  row avatar, replacing the food emoji. */
+export function TierChip({ tier, size = 32 }: { tier: PerishTier; size?: number }) {
+  const m = TIER_META[tier];
+  return (
+    <span
+      className="flex shrink-0 items-center justify-center rounded-full bg-white text-zinc-600 ring-1 ring-zinc-200"
+      style={{ width: size, height: size }}
+      title={m.label}
+      aria-label={m.label}
+    >
+      <Icon name={m.iconKey} size={Math.round(size * 0.5)} />
+    </span>
   );
 }
 
