@@ -51,7 +51,9 @@ export interface InventoryLot {
 }
 
 /** Where food goes OUT. Prepared/bulk routes to meal programs; groceries go to
- *  families as boxes. Enables tier-aware routing on the distribution surface. */
+ *  families as boxes. Enables tier-aware routing on the distribution surface.
+ *  Family recipients are named first-name-plus-initial only — real pantries
+ *  guard client identity. */
 export type PartnerKind = 'meal_program' | 'family';
 
 export interface Partner {
@@ -60,47 +62,61 @@ export interface Partner {
   kind: PartnerKind;
 }
 
+/** A volunteer or staff member who can own a trip — who drives, who receives,
+ *  who packs, who calls. A name on a task is data, not auth: no accounts. */
+export interface TeamMember {
+  id: string;
+  name: string;
+}
+
+/** Every food movement is a TRIP, and every trip has a transport direction:
+ *  they_come — the counterparty comes to our dock (drop-off / pickup-at-bank)
+ *  we_go     — one of ours drives out (we collect a donation / we deliver) */
+export type TransportMode = 'they_come' | 'we_go';
+
 export interface RequestItem {
   lotId: string;
   quantity: number;
 }
 
-export interface PickupRequest {
-  id: string;
-  partnerId: string;
-  items: RequestItem[];
-  status: 'requested' | 'confirmed';
-}
-
-/** A recorded release — food that LEFT the shelf. Immediate (no two-step):
- *   push  — dying food offered to a meal program (decay-forward)
- *   box   — a FEFO family box the app built
- *   order — a standing partner order, released
- *  Rule 2 lives here too: releasing decrements the referenced lots. */
-export interface DistributionLine {
+/** One line of an outbound movement. Name/unit resolve from the lot (lots are
+ *  never deleted). `released` is filled only at handoff — the commit point. */
+export interface MovementLine {
   lotId: string;
-  name: string;
-  unit: string;
-  requested: number;
-  released: number; // clamped at what was on hand; 0 if the lot had expired
+  quantity: number;
+  /** Set at handoff: min(quantity, onHand), 0 if the lot had expired. */
+  released?: number;
 }
 
-export interface DistributionRecord {
+/**
+ * An outbound movement — food working its way OFF the shelf. The pipeline is
+ * derived from what's still missing, never stored (house rule):
+ *   not packed            -> PACK     box it / stage it cold
+ *   packed, no recipient  -> MATCH    find a taker (call the list)
+ *   packed + recipient    -> HANDOFF  they pick up here, or we deliver
+ * Completing the handoff is the single commit point (rule 2): the referenced
+ * lots decrement, clamped, shortfall named. Pack/match reserve NOTHING —
+ * consistent with "requests reserve nothing; first-commit-wins."
+ * Doors in: a partner request (born matched), a decay push (born unmatched),
+ * a FEFO box (born packed).
+ */
+export interface OutboundMovement {
   id: string;
-  recipientId: string;
-  recipientName: string;
-  recipientKind: PartnerKind;
-  mode: 'push' | 'box' | 'order';
-  lines: DistributionLine[];
-  /** Households served (family boxes only; 0 otherwise). */
-  households: number;
-  date: ISODate;
+  lines: MovementLine[];
+  packed: boolean;
+  recipientId?: string;
+  mode?: TransportMode;
+  assigneeId?: string;
+  note?: string;
+  status: 'open' | 'released';
+  createdDate: ISODate;
+  releasedDate?: ISODate;
 }
 
 /** An incoming donation, captured as a PROMISE before it arrives (the phone
  *  call is the manifest) and turned into real lots only when verified at the
- *  dock. Mirror of PickupRequest: promise -> confirm. Where confirm DECREMENTS
- *  for a pickup, receiving a delivery CREATES new lots. */
+ *  dock. Mirror of the outbound movement: promise -> commit. Where a handoff
+ *  DECREMENTS lots, receiving a delivery CREATES them. */
 export type DeliveryKind = 'recurring' | 'catering' | 'drive' | 'individual';
 
 export interface DeliveryItem {
@@ -121,6 +137,11 @@ export interface Delivery {
   kind: DeliveryKind;
   status: 'expected' | 'received';
   expectedDate: ISODate;
+  /** they_come — the donor drops off at our dock; we_go — one of ours drives
+   *  out to collect (catering surplus is almost always a we_go trip). */
+  mode: TransportMode;
+  /** Who owns this trip: the driver (we_go) or the dock receiver (they_come). */
+  assigneeId?: string;
   note?: string;
   items: DeliveryItem[];
 }

@@ -20,9 +20,14 @@ import { cn } from '../ui/cn';
 export function DeliveryOriginMap({
   donorName,
   timing,
+  outbound = false,
 }: {
   donorName: string;
   timing: string;
+  /** true = a we-go trip (one of ours drives out to collect); false = the
+   *  donor comes to us. Same two honest points either way — only the
+   *  direction chip changes, since we track no live position. */
+  outbound?: boolean;
 }) {
   return (
     <div className="relative h-28 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50">
@@ -63,6 +68,11 @@ export function DeliveryOriginMap({
         </span>
       </div>
 
+      {/* trip direction — semantic, since we show no live position */}
+      <div className="eyebrow absolute right-1.5 top-1.5 rounded bg-white px-1.5 py-0.5 text-[9px] font-bold text-zinc-500 shadow-sm ring-1 ring-zinc-200">
+        {outbound ? 'WE PICK UP' : 'DROP-OFF'}
+      </div>
+
       <div className="absolute bottom-1.5 left-2 text-[10px] text-zinc-400">{timing}</div>
     </div>
   );
@@ -77,12 +87,14 @@ const NODE_TONE: Record<'urgent' | 'normal' | 'calm', { dot: string; num: string
 interface StatusBucket {
   n: number;
   label: string;
+  /** The WHO at this stage — owner first names, or the outreach hint. */
+  sub?: string;
   tone: 'urgent' | 'normal' | 'calm';
 }
 
-/** Food Out: today's real outbound status as three independent, honest
- *  counts — not a fabricated single-item journey (our domain only tracks
- *  pending vs. released; there's no real "packed" or "ready" checkpoint). */
+/** Food Out: the real pipeline — Pack → Match → Handoff — as honest per-stage
+ *  counts with the owner named under each stage. Each count is a real derived
+ *  state (getMovementStage), not a fabricated per-item journey. */
 export function OutboundStatusBoard({ buckets }: { buckets: StatusBucket[] }) {
   return (
     <div className="flex h-28 flex-col justify-center rounded-xl border border-zinc-200 bg-zinc-50 px-4">
@@ -112,13 +124,16 @@ export function OutboundStatusBoard({ buckets }: { buckets: StatusBucket[] }) {
           </span>
         ))}
       </div>
-      <div className="mt-1.5 flex items-center justify-between">
+      <div className="mt-1.5 flex items-start justify-between">
         {buckets.map((b) => (
           <span
             key={b.label}
             className="w-16 text-center text-[10px] leading-tight text-zinc-500"
           >
             {b.label}
+            {b.sub && (
+              <span className="block truncate text-[9px] text-zinc-400">{b.sub}</span>
+            )}
           </span>
         ))}
       </div>

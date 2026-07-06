@@ -10,59 +10,53 @@ import type {
   Config,
   Delivery,
   DeliveryItem,
-  DistributionRecord,
   InventoryLot,
   ISODate,
+  OutboundMovement,
   Partner,
-  PickupRequest,
-  RequestItem,
+  TeamMember,
   WasteEvent,
 } from '../domain/types';
 import { todayISO } from '../domain/dates';
 import { buildSeed } from '../data/seed';
-import { confirmRequest as domainConfirmRequest } from '../domain/requests';
 import { markWaste as domainMarkWaste } from '../domain/waste';
 import { receiveDelivery as domainReceiveDelivery } from '../domain/deliveries';
-import {
-  releaseLots as domainReleaseLots,
-  type ReleaseItem,
-} from '../domain/distribution';
+import { completeHandoff as domainCompleteHandoff } from '../domain/distribution';
 
 // ---------------------------------------------------------------------------
 // The single client-side store. One surface, one user (the shelf-keeper), two
-// mutations: food in (ADD_DONATION) and food out (CONFIRM). Every derived
-// value (statuses, zones, availability) is a pure function computed at render,
-// never written back. `today` is captured once at app start and lives in state
-// so logic stays deterministic and testable.
+// commit points: the DOCK (receive creates lots) and the HANDOFF (release
+// decrements them). Everything between — expected deliveries, open movements —
+// is a promise that reserves nothing. Derived values are pure functions
+// computed at render; `today` is captured once so logic stays deterministic.
 // ---------------------------------------------------------------------------
 
 interface StoreState {
   lots: InventoryLot[];
-  requests: PickupRequest[];
+  movements: OutboundMovement[];
   deliveries: Delivery[];
-  distributions: DistributionRecord[];
   partners: Partner[];
+  team: TeamMember[];
   wasteEvents: WasteEvent[];
   config: Config;
   today: ISODate;
   lastReminder: string | null;
 }
 
+/** The editable (pre-commit) fields of an open movement. */
+type MovementPatch = Partial<
+  Pick<OutboundMovement, 'packed' | 'recipientId' | 'mode' | 'assigneeId' | 'note'>
+>;
+
 type Action =
   | { type: 'ADD_DONATION'; lot: InventoryLot }
   | { type: 'UPDATE_QUANTITY'; lotId: string; quantity: number }
-  | { type: 'ADD_REQUEST'; request: PickupRequest }
-  | { type: 'CONFIRM'; requestId: string }
   | { type: 'MARK_WASTE'; lotId: string; quantity: number; eventId: string }
   | { type: 'ADD_DELIVERY'; delivery: Delivery }
   | { type: 'RECEIVE_DELIVERY'; deliveryId: string; items: DeliveryItem[] }
-  | {
-      type: 'RELEASE';
-      recipientId: string;
-      mode: DistributionRecord['mode'];
-      items: ReleaseItem[];
-      households: number;
-    }
+  | { type: 'ADD_MOVEMENT'; movement: OutboundMovement }
+  | { type: 'PATCH_MOVEMENT'; movementId: string; patch: MovementPatch }
+  | { type: 'COMPLETE_HANDOFF'; movementId: string }
   | { type: 'DISMISS_REMINDER' }
   | { type: 'RESET' };
 
@@ -70,10 +64,10 @@ function freshState(today: ISODate): StoreState {
   const seed = buildSeed(today);
   return {
     lots: seed.lots,
-    requests: seed.requests,
+    movements: seed.movements,
     deliveries: seed.deliveries,
-    distributions: [],
     partners: seed.partners,
+    team: seed.team,
     wasteEvents: [],
     config: seed.config,
     today,
@@ -98,33 +92,8 @@ function reducer(state: StoreState, action: Action): StoreState {
         ),
       };
 
-    case 'ADD_REQUEST':
-      return { ...state, requests: [...state.requests, action.request] };
-
-    case 'CONFIRM': {
-      // Rule 2: confirm decrements. Delegates to the pure domain function.
-      const res = domainConfirmRequest(
-        action.requestId,
-        state.lots,
-        state.requests,
-        state.partners,
-        state.today,
-        state.config,
-      );
-      if (!res) return state; // missing or already-confirmed: no-op
-      return {
-        ...state,
-        lots: res.lots,
-        requests: state.requests.map((r) =>
-          r.id === res.request.id ? res.request : r,
-        ),
-        lastReminder: res.reminder,
-      };
-    }
-
     case 'MARK_WASTE': {
-      // The third verb: pull it, toss it, record it. Delegates to the pure
-      // domain function; partial waste allowed, clamped at what's on hand.
+      // Pull it, toss it, record it. Partial allowed, clamped at on-hand.
       const res = domainMarkWaste(
         action.lotId,
         action.quantity,
@@ -146,8 +115,7 @@ function reducer(state: StoreState, action: Action): StoreState {
       return { ...state, deliveries: [...state.deliveries, action.delivery] };
 
     case 'RECEIVE_DELIVERY': {
-      // The dock checkpoint: verified items become NEW lots (rule 1 — never
-      // merge). Mirror of CONFIRM, but creating instead of decrementing.
+      // Commit point IN: verified items become NEW lots (rule 1 — never merge).
       const res = domainReceiveDelivery(
         action.deliveryId,
         action.items,
@@ -167,24 +135,40 @@ function reducer(state: StoreState, action: Action): StoreState {
       };
     }
 
-    case 'RELEASE': {
-      // Rule 2 for immediate outflow (push / FEFO box / order): decrement the
-      // referenced lots and log what left.
-      const recipient = state.partners.find((p) => p.id === action.recipientId);
-      if (!recipient) return state;
-      const res = domainReleaseLots(
-        recipient,
-        action.mode,
-        action.items,
-        action.households,
+    case 'ADD_MOVEMENT':
+      // A movement enters the pipeline (request / decay push / FEFO box).
+      // Reserves nothing — first handoff wins the stock.
+      return { ...state, movements: [...state.movements, action.movement] };
+
+    case 'PATCH_MOVEMENT':
+      // Pipeline progress before the commit: pack, match, assign. Only open
+      // movements are editable; a released movement is history.
+      return {
+        ...state,
+        movements: state.movements.map((m) =>
+          m.id === action.movementId && m.status === 'open'
+            ? { ...m, ...action.patch }
+            : m,
+        ),
+      };
+
+    case 'COMPLETE_HANDOFF': {
+      // Commit point OUT (rule 2): decrement referenced lots, clamped;
+      // expired ships 0; shortfall named in the reminder.
+      const res = domainCompleteHandoff(
+        action.movementId,
+        state.movements,
         state.lots,
+        state.partners,
         state.today,
-        () => crypto.randomUUID(),
       );
+      if (!res) return state; // missing, unmatched, unpacked, or released
       return {
         ...state,
         lots: res.lots,
-        distributions: [...state.distributions, res.distribution],
+        movements: state.movements.map((m) =>
+          m.id === res.movement.id ? res.movement : m,
+        ),
         lastReminder: res.reminder,
       };
     }
@@ -200,17 +184,17 @@ function reducer(state: StoreState, action: Action): StoreState {
   }
 }
 
-const STORAGE_KEY = 'food-bank-inventory:v5';
+const STORAGE_KEY = 'food-bank-inventory:v6';
 
 interface PersistShape {
   today: ISODate;
   data: Pick<
     StoreState,
     | 'lots'
-    | 'requests'
+    | 'movements'
     | 'deliveries'
-    | 'distributions'
     | 'partners'
+    | 'team'
     | 'wasteEvents'
     | 'config'
   >;
@@ -226,8 +210,9 @@ function loadInitial(today: ISODate): StoreState {
       if (saved.today === today && saved.data?.lots) {
         return {
           ...saved.data,
+          movements: saved.data.movements ?? [],
           deliveries: saved.data.deliveries ?? [],
-          distributions: saved.data.distributions ?? [],
+          team: saved.data.team ?? [],
           wasteEvents: saved.data.wasteEvents ?? [],
           today,
           lastReminder: null,
@@ -243,17 +228,16 @@ function loadInitial(today: ISODate): StoreState {
 interface StoreValue extends StoreState {
   addDonation: (input: Omit<InventoryLot, 'id'>) => void;
   updateLotQuantity: (lotId: string, quantity: number) => void;
-  createRequest: (partnerId: string, items: RequestItem[]) => PickupRequest;
-  confirmRequest: (requestId: string) => void;
   markWaste: (lotId: string, quantity: number) => void;
   addDelivery: (delivery: Omit<Delivery, 'id' | 'status'>) => void;
   receiveDelivery: (deliveryId: string, items: DeliveryItem[]) => void;
-  release: (
-    recipientId: string,
-    mode: DistributionRecord['mode'],
-    items: ReleaseItem[],
-    households?: number,
+  /** A movement enters the pipeline. Doors: request (born matched), decay
+   *  push (born unmatched), FEFO box (born packed). */
+  addMovement: (
+    input: Omit<OutboundMovement, 'id' | 'status' | 'createdDate'>,
   ) => void;
+  patchMovement: (movementId: string, patch: MovementPatch) => void;
+  completeHandoff: (movementId: string) => void;
   dismissReminder: () => void;
   reset: () => void;
 }
@@ -271,10 +255,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       today: state.today,
       data: {
         lots: state.lots,
-        requests: state.requests,
+        movements: state.movements,
         deliveries: state.deliveries,
-        distributions: state.distributions,
         partners: state.partners,
+        team: state.team,
         wasteEvents: state.wasteEvents,
         config: state.config,
       },
@@ -295,17 +279,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }),
     updateLotQuantity: (lotId, quantity) =>
       dispatch({ type: 'UPDATE_QUANTITY', lotId, quantity }),
-    createRequest: (partnerId, items) => {
-      const request: PickupRequest = {
-        id: crypto.randomUUID(),
-        partnerId,
-        items,
-        status: 'requested',
-      };
-      dispatch({ type: 'ADD_REQUEST', request });
-      return request;
-    },
-    confirmRequest: (requestId) => dispatch({ type: 'CONFIRM', requestId }),
     markWaste: (lotId, quantity) =>
       dispatch({
         type: 'MARK_WASTE',
@@ -320,8 +293,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }),
     receiveDelivery: (deliveryId, items) =>
       dispatch({ type: 'RECEIVE_DELIVERY', deliveryId, items }),
-    release: (recipientId, mode, items, households = 0) =>
-      dispatch({ type: 'RELEASE', recipientId, mode, items, households }),
+    addMovement: (input) =>
+      dispatch({
+        type: 'ADD_MOVEMENT',
+        movement: {
+          ...input,
+          id: crypto.randomUUID(),
+          status: 'open',
+          createdDate: state.today,
+        },
+      }),
+    patchMovement: (movementId, patch) =>
+      dispatch({ type: 'PATCH_MOVEMENT', movementId, patch }),
+    completeHandoff: (movementId) =>
+      dispatch({ type: 'COMPLETE_HANDOFF', movementId }),
     dismissReminder: () => dispatch({ type: 'DISMISS_REMINDER' }),
     reset: () => dispatch({ type: 'RESET' }),
   };

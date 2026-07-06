@@ -3,7 +3,7 @@ import type { Delivery } from '../domain/types';
 import { daysUntil } from '../domain/dates';
 import { useStore } from '../store/useStore';
 import { useUI } from '../store/useUI';
-import { Button, Card, Icon, SectionHeader, TierMark } from '../ui/primitives';
+import { Button, Card, Icon, SectionHeader, TeamBadge, TierMark } from '../ui/primitives';
 import { cn } from '../ui/cn';
 import { SPRING } from '../ui/motion';
 
@@ -18,7 +18,7 @@ const KIND_LABEL: Record<Delivery['kind'], string> = {
  *  food is on its way), so they live on Home. Receiving opens the dock sheet;
  *  received deliveries leave the list (they've become lots). */
 export function IncomingDeliveries() {
-  const { deliveries, today } = useStore();
+  const { deliveries, team, today } = useStore();
   const { openExpect, openReceive } = useUI();
 
   const expected = deliveries
@@ -26,6 +26,9 @@ export function IncomingDeliveries() {
     .sort((a, b) => a.expectedDate.localeCompare(b.expectedDate));
 
   if (expected.length === 0) return null;
+
+  const incoming = expected.filter((d) => d.mode === 'they_come');
+  const pickups = expected.filter((d) => d.mode === 'we_go');
 
   return (
     <Card className="p-4 sm:p-5">
@@ -40,22 +43,52 @@ export function IncomingDeliveries() {
         }
       >
         <span className="inline-flex items-center gap-1.5">
-          <Icon name="truck" size={14} className="text-zinc-400" /> Incoming deliveries
+          <Icon name="truck" size={14} className="text-zinc-400" /> Incoming
         </span>
       </SectionHeader>
 
-      <ul className="mt-3 space-y-2.5">
-        <AnimatePresence initial={false}>
-          {expected.map((d) => (
-            <DeliveryRow
-              key={d.id}
-              delivery={d}
-              daysAway={daysUntil(d.expectedDate, today)}
-              onReceive={() => openReceive(d.id)}
-            />
-          ))}
-        </AnimatePresence>
-      </ul>
+      {/* Two distinct lists — a delivery (they come) is not a pickup (we go). */}
+      {incoming.length > 0 && (
+        <>
+          <div className="eyebrow mt-3 text-[10px] font-bold text-zinc-400">
+            Deliveries — {incoming.length}
+          </div>
+          <ul className="mt-1.5 space-y-2.5">
+            <AnimatePresence initial={false}>
+              {incoming.map((d) => (
+                <DeliveryRow
+                  key={d.id}
+                  delivery={d}
+                  daysAway={daysUntil(d.expectedDate, today)}
+                  assignee={team.find((t) => t.id === d.assigneeId)}
+                  onReceive={() => openReceive(d.id)}
+                />
+              ))}
+            </AnimatePresence>
+          </ul>
+        </>
+      )}
+
+      {pickups.length > 0 && (
+        <>
+          <div className={cn('eyebrow text-[10px] font-bold text-zinc-400', incoming.length > 0 && 'mt-4')}>
+            Our pickups — {pickups.length}
+          </div>
+          <ul className="mt-1.5 space-y-2.5">
+            <AnimatePresence initial={false}>
+              {pickups.map((d) => (
+                <DeliveryRow
+                  key={d.id}
+                  delivery={d}
+                  daysAway={daysUntil(d.expectedDate, today)}
+                  assignee={team.find((t) => t.id === d.assigneeId)}
+                  onReceive={() => openReceive(d.id)}
+                />
+              ))}
+            </AnimatePresence>
+          </ul>
+        </>
+      )}
     </Card>
   );
 }
@@ -63,15 +96,18 @@ export function IncomingDeliveries() {
 function DeliveryRow({
   delivery,
   daysAway,
+  assignee,
   onReceive,
 }: {
   delivery: Delivery;
   daysAway: number;
+  assignee?: { id: string; name: string };
   onReceive: () => void;
 }) {
   const when =
     daysAway <= 0 ? 'Today' : daysAway === 1 ? 'Tomorrow' : `in ${daysAway} days`;
   const units = delivery.items.reduce((s, it) => s + it.quantity, 0);
+  const tripLabel = delivery.mode === 'we_go' ? 'we pick up' : 'drop-off';
 
   return (
     <motion.li
@@ -90,6 +126,9 @@ function DeliveryRow({
           <span className="eyebrow rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-bold text-zinc-500">
             {KIND_LABEL[delivery.kind]}
           </span>
+          <span className="eyebrow rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-bold text-zinc-500">
+            {tripLabel}
+          </span>
           <span
             className={cn(
               'eyebrow inline-flex items-center gap-1 text-[10px] font-bold',
@@ -98,6 +137,7 @@ function DeliveryRow({
           >
             <Icon name="clock" size={11} /> {when}
           </span>
+          {assignee && <TeamBadge id={assignee.id} name={assignee.name} />}
         </div>
         <Button size="sm" onClick={onReceive}>
           <Icon name="inbox" size={14} /> Receive

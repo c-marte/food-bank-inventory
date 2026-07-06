@@ -4,20 +4,22 @@ import type {
   Delivery,
   DeliveryItem,
   InventoryLot,
+  OutboundMovement,
   Partner,
-  PickupRequest,
 } from './types';
 import { addDays } from './dates';
 import { getNonExpiredQuantity, isLowStock } from './status';
 import { getExpiringZoneLots, getLowStockZone } from './dashboard';
 import {
-  confirmRequest,
-  getPartnerAvailability,
+  buildFefoBox,
+  completeHandoff,
+  getAvailability,
+  getDyingLots,
+  getMovementStage,
   validateRequestItems,
-} from './requests';
+} from './distribution';
 import { markWaste } from './waste';
 import { categoryDefaultExpiry, receiveDelivery } from './deliveries';
-import { buildFefoBox, getDyingLots, releaseLots } from './distribution';
 import { parseDonation } from './parseDonation';
 import { inferTier } from './tier';
 import { buildSeed } from '../data/seed';
@@ -124,69 +126,96 @@ describe('Zone B — low stock, most urgent (lowest fill ratio) first', () => {
   });
 });
 
-describe('partner availability', () => {
+describe('availability', () => {
   it('excludes expired and zero-quantity lots', () => {
     const lots = [
       lot({ id: 'ok', expiryDate: addDays(TODAY, 30) }),
       lot({ id: 'expired', expiryDate: addDays(TODAY, -1) }),
       lot({ id: 'zero', quantity: 0 }),
     ];
-    const avail = getPartnerAvailability(lots, TODAY, CONFIG);
+    const avail = getAvailability(lots, TODAY, CONFIG);
     expect(avail.map((l) => l.id)).toEqual(['ok']);
   });
 });
 
-describe('confirmRequest — rule 2: confirm decrements', () => {
-  const partners: Partner[] = [{ id: 'partner-1', name: 'Northside', kind: 'meal_program' }];
+describe('movement pipeline — derived stage + handoff commit (rule 2)', () => {
+  const partners: Partner[] = [
+    { id: 'partner-1', name: 'Northside', kind: 'meal_program' },
+    { id: 'partner-3', name: 'Rosa M.', kind: 'family' },
+  ];
 
-  it('decrements referenced lots and queues a clean reminder', () => {
+  const movement = (p: Partial<OutboundMovement> & { id: string }): OutboundMovement => ({
+    lines: [{ lotId: 'l1', quantity: 4 }],
+    packed: true,
+    recipientId: 'partner-1',
+    mode: 'we_go',
+    status: 'open',
+    createdDate: TODAY,
+    ...p,
+  });
+
+  it('stage is derived from what is missing, never stored', () => {
+    expect(getMovementStage(movement({ id: 'm', packed: false }))).toBe('pack');
+    expect(getMovementStage(movement({ id: 'm', packed: false, recipientId: undefined }))).toBe('pack');
+    expect(getMovementStage(movement({ id: 'm', recipientId: undefined }))).toBe('match');
+    expect(getMovementStage(movement({ id: 'm' }))).toBe('handoff');
+    expect(getMovementStage(movement({ id: 'm', status: 'released' }))).toBe('released');
+  });
+
+  it('handoff decrements referenced lots and names the mode in the reminder', () => {
     const lots = [lot({ id: 'l1', name: 'Beans', quantity: 10 })];
-    const requests: PickupRequest[] = [
-      { id: 'r1', partnerId: 'partner-1', status: 'requested', items: [{ lotId: 'l1', quantity: 4 }] },
-    ];
-    const res = confirmRequest('r1', lots, requests, partners, TODAY, CONFIG)!;
+    const res = completeHandoff('m1', [movement({ id: 'm1' })], lots, partners, TODAY)!;
     expect(res.lots.find((l) => l.id === 'l1')!.quantity).toBe(6); // 10 - 4
-    expect(res.request.status).toBe('confirmed');
-    expect(res.reminder).toBe('Reminder queued: notify Northside — released (1 item).');
+    expect(res.movement.status).toBe('released');
+    expect(res.movement.releasedDate).toBe(TODAY);
+    expect(res.reminder).toBe('Released — 1 item delivered to Northside.');
   });
 
-  it('clamps at zero and reports a shortfall in the reminder', () => {
+  it('they_come handoff reads as picked up', () => {
+    const lots = [lot({ id: 'l1', quantity: 10 })];
+    const res = completeHandoff(
+      'm1',
+      [movement({ id: 'm1', recipientId: 'partner-3', mode: 'they_come' })],
+      lots, partners, TODAY,
+    )!;
+    expect(res.reminder).toBe('Released — 1 item picked up by Rosa M..');
+  });
+
+  it('clamps at zero and names the shortfall', () => {
     const lots = [lot({ id: 'l1', name: 'Bananas', quantity: 5 })];
-    const requests: PickupRequest[] = [
-      { id: 'r1', partnerId: 'partner-1', status: 'requested', items: [{ lotId: 'l1', quantity: 8 }] },
-    ];
-    const res = confirmRequest('r1', lots, requests, partners, TODAY, CONFIG)!;
+    const res = completeHandoff(
+      'm1',
+      [movement({ id: 'm1', lines: [{ lotId: 'l1', quantity: 8 }] })],
+      lots, partners, TODAY,
+    )!;
     expect(res.lots.find((l) => l.id === 'l1')!.quantity).toBe(0); // max(0, 5 - 8)
-    expect(res.reminder).toBe(
-      'Reminder queued: notify Northside — released with shortages: Bananas (5 of 8).',
-    );
+    expect(res.reminder).toBe('Released to Northside with shortages: Bananas (5 of 8).');
   });
 
-  it('never ships expired food: fulfill 0, do not decrement', () => {
+  it('never ships expired food: releases 0, does not decrement', () => {
     const lots = [lot({ id: 'l1', name: 'Milk', quantity: 4, expiryDate: addDays(TODAY, -1) })];
-    const requests: PickupRequest[] = [
-      { id: 'r1', partnerId: 'partner-1', status: 'requested', items: [{ lotId: 'l1', quantity: 2 }] },
-    ];
-    const res = confirmRequest('r1', lots, requests, partners, TODAY, CONFIG)!;
+    const res = completeHandoff(
+      'm1',
+      [movement({ id: 'm1', lines: [{ lotId: 'l1', quantity: 2 }] })],
+      lots, partners, TODAY,
+    )!;
     expect(res.lots.find((l) => l.id === 'l1')!.quantity).toBe(4); // untouched
-    expect(res.fulfillments[0].fulfilled).toBe(0);
+    expect(res.movement.lines[0].released).toBe(0);
   });
 
-  it('is idempotent-guarded: confirming a confirmed request is a no-op (null)', () => {
+  it('is stage-guarded: unpacked, unmatched, or already-released → null', () => {
     const lots = [lot({ id: 'l1', quantity: 10 })];
-    const requests: PickupRequest[] = [
-      { id: 'r1', partnerId: 'partner-1', status: 'confirmed', items: [{ lotId: 'l1', quantity: 4 }] },
-    ];
-    expect(confirmRequest('r1', lots, requests, partners, TODAY, CONFIG)).toBeNull();
+    expect(completeHandoff('m1', [movement({ id: 'm1', packed: false })], lots, partners, TODAY)).toBeNull();
+    expect(completeHandoff('m1', [movement({ id: 'm1', recipientId: undefined })], lots, partners, TODAY)).toBeNull();
+    expect(completeHandoff('m1', [movement({ id: 'm1', status: 'released' })], lots, partners, TODAY)).toBeNull();
   });
 
-  it('does not mutate the input lots array (immutable update)', () => {
+  it('does not mutate the input arrays (immutable update)', () => {
     const lots = [lot({ id: 'l1', quantity: 10 })];
-    const requests: PickupRequest[] = [
-      { id: 'r1', partnerId: 'partner-1', status: 'requested', items: [{ lotId: 'l1', quantity: 4 }] },
-    ];
-    confirmRequest('r1', lots, requests, partners, TODAY, CONFIG);
-    expect(lots[0].quantity).toBe(10); // original untouched
+    const movements = [movement({ id: 'm1' })];
+    completeHandoff('m1', movements, lots, partners, TODAY);
+    expect(lots[0].quantity).toBe(10);
+    expect(movements[0].status).toBe('open');
   });
 });
 
@@ -276,7 +305,7 @@ describe('markWaste', () => {
 describe('receiveDelivery', () => {
   const makeDelivery = (items: DeliveryItem[]): Delivery => ({
     id: 'd1', donorName: "Sal's Catering", kind: 'catering',
-    status: 'expected', expectedDate: TODAY, items,
+    status: 'expected', expectedDate: TODAY, mode: 'we_go', items,
   });
   const item = (p: Partial<DeliveryItem> & { id: string }): DeliveryItem => ({
     name: 'Baked Ziti', category: 'grains', tier: 'prepared', quantity: 6, unit: 'trays',
@@ -373,12 +402,7 @@ describe('parseDonation', () => {
 // ---------------------------------------------------------------------------
 // Distribution — food out, decay-forward. Release decrements immediately.
 // ---------------------------------------------------------------------------
-describe('distribution — dying lots, FEFO box, release', () => {
-  const kitchen: Partner = { id: 'p1', name: 'Northside', kind: 'meal_program' };
-  const family: Partner = { id: 'p3', name: 'Neighborhood Families', kind: 'family' };
-  let n = 0;
-  const makeId = () => `dist-${++n}`;
-
+describe('distribution — dying lots + FEFO box (the pipeline doors)', () => {
   it('getDyingLots: only expiring_soon with qty > 0, soonest first', () => {
     const lots = [
       lot({ id: 'ok', tier: 'fresh', expiryDate: addDays(TODAY, 30) }),
@@ -403,37 +427,35 @@ describe('distribution — dying lots, FEFO box, release', () => {
     expect(box.map((i) => i.lotId)).toEqual(['prod1', 'dairy']);
     expect(box.every((i) => i.quantity === 1)).toBe(true);
   });
+});
 
-  it('releaseLots decrements (clamped), logs the record, and never ships expired', () => {
-    n = 0;
-    const lots = [
-      lot({ id: 'l1', name: 'Ziti', quantity: 6 }),
-      lot({ id: 'l2', name: 'Milk', quantity: 4, expiryDate: addDays(TODAY, -1) }), // expired
-    ];
-    const res = releaseLots(
-      kitchen, 'push',
-      [{ lotId: 'l1', quantity: 8 }, { lotId: 'l2', quantity: 2 }],
-      0, lots, TODAY, makeId,
-    );
-    expect(res.lots.find((l) => l.id === 'l1')!.quantity).toBe(0); // max(0, 6-8)
-    expect(res.lots.find((l) => l.id === 'l2')!.quantity).toBe(4); // expired, untouched
-    expect(res.distribution.lines.find((x) => x.lotId === 'l2')!.released).toBe(0);
-    expect(res.reminder).toMatch(/notify Northside — released with shortages: Ziti \(6 of 8\)/);
+describe('seed movements populate every pipeline stage', () => {
+  it('one movement at pack, one at match, one at handoff — all lines valid', () => {
+    const seed = buildSeed(TODAY);
+    const stages = seed.movements.map(getMovementStage).sort();
+    expect(stages).toEqual(['handoff', 'match', 'pack']);
+    // every line references a real, stocked lot
+    for (const m of seed.movements) {
+      for (const line of m.lines) {
+        const l = seed.lots.find((x) => x.id === line.lotId);
+        expect(l).toBeDefined();
+        expect(l!.quantity).toBeGreaterThanOrEqual(line.quantity);
+      }
+    }
+    // assignees and recipients resolve
+    for (const m of seed.movements) {
+      if (m.assigneeId) expect(seed.team.some((t) => t.id === m.assigneeId)).toBe(true);
+      if (m.recipientId) expect(seed.partners.some((p) => p.id === m.recipientId)).toBe(true);
+    }
   });
 
-  it('family release uses a box-packed reminder and records households', () => {
-    n = 0;
-    const lots = [lot({ id: 'l1', name: 'Bananas', quantity: 10 })];
-    const res = releaseLots(family, 'box', [{ lotId: 'l1', quantity: 1 }], 1, lots, TODAY, makeId);
-    expect(res.reminder).toBe('Family box packed — 1 item off the shelf.');
-    expect(res.distribution.households).toBe(1);
-    expect(res.lots[0].quantity).toBe(9);
-  });
-
-  it('does not mutate the input lots array', () => {
-    n = 0;
-    const lots = [lot({ id: 'l1', quantity: 5 })];
-    releaseLots(kitchen, 'push', [{ lotId: 'l1', quantity: 2 }], 0, lots, TODAY, makeId);
-    expect(lots[0].quantity).toBe(5);
+  it('seeded deliveries carry a transport mode and a resolvable assignee', () => {
+    const seed = buildSeed(TODAY);
+    for (const d of seed.deliveries) {
+      expect(['they_come', 'we_go']).toContain(d.mode);
+      if (d.assigneeId) expect(seed.team.some((t) => t.id === d.assigneeId)).toBe(true);
+    }
+    // the catering surplus is a we-go trip (a volunteer drives out)
+    expect(seed.deliveries.find((d) => d.donorName === "Sal's Catering")!.mode).toBe('we_go');
   });
 });

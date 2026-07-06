@@ -14,9 +14,9 @@ const TABS: { id: View; label: string }[] = [
  *  right. The standing picture (Shelf) plus the two verbs (Intake / Distribution).
  *  Tabs, not a sidebar — nav chrome scales with the destination count. */
 export function Header() {
-  const { today, reset, requests, deliveries } = useStore();
+  const { today, reset, movements, deliveries } = useStore();
   const { view, navigate } = useUI();
-  const pending = requests.filter((r) => r.status === 'requested').length;
+  const pending = movements.filter((m) => m.status === 'open').length;
   const incoming = deliveries.filter((d) => d.status === 'expected').length;
   const badgeFor = (id: View) =>
     id === 'distribution' ? pending : id === 'intake' ? incoming : 0;

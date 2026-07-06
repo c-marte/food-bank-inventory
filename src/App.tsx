@@ -5,7 +5,7 @@ import { UIProvider, useUI } from './store/useUI';
 import { Header } from './components/Header';
 import { Home } from './components/Home';
 import { IntakePage } from './components/IntakePage';
-import { PickupsQueue } from './components/PickupsQueue';
+import { DistributionPage } from './components/DistributionPage';
 import { LotList } from './components/LotList';
 import { ReminderLine } from './components/ReminderLine';
 import { IntakeForm } from './components/IntakeForm';
@@ -36,7 +36,7 @@ function Shell() {
 
         {view === 'shelf' && <Home />}
         {view === 'intake' && <IntakePage />}
-        {view === 'distribution' && <PickupsQueue />}
+        {view === 'distribution' && <DistributionPage />}
         {view === 'inventory' && <LotList />}
       </main>
 

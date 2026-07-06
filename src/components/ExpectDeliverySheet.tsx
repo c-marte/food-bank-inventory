@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react';
-import type { DeliveryItem, DeliveryKind, ISODate } from '../domain/types';
+import type {
+  DeliveryItem,
+  DeliveryKind,
+  ISODate,
+  TransportMode,
+} from '../domain/types';
 import { addDays } from '../domain/dates';
 import { categoryDefaultExpiry } from '../domain/deliveries';
 import { guessCategory, type ParsedItem } from '../domain/parseDonation';
@@ -7,7 +12,7 @@ import { inferTier } from '../domain/tier';
 import { KNOWN_DONORS } from '../data/seed';
 import { useStore } from '../store/useStore';
 import { Sheet } from '../ui/Sheet';
-import { Button, Chip, Field, Icon, Stepper, inputClass } from '../ui/primitives';
+import { Button, Chip, Field, Icon, Stepper, TeamAvatar, inputClass } from '../ui/primitives';
 import { CaptureBar } from './CaptureBar';
 import { cn } from '../ui/cn';
 
@@ -45,10 +50,12 @@ export function ExpectDeliverySheet({
   open: boolean;
   onClose: () => void;
 }) {
-  const { today, addDelivery } = useStore();
+  const { today, team, addDelivery } = useStore();
   const [donorName, setDonorName] = useState('');
   const [kind, setKind] = useState<DeliveryKind>('individual');
   const [expectedDate, setExpectedDate] = useState(today);
+  const [mode, setMode] = useState<TransportMode>('they_come');
+  const [assigneeId, setAssigneeId] = useState<string | undefined>();
   const [note, setNote] = useState('');
   const [rows, setRows] = useState<Row[]>([blankRow()]);
 
@@ -57,6 +64,8 @@ export function ExpectDeliverySheet({
       setDonorName('');
       setKind('individual');
       setExpectedDate(today);
+      setMode('they_come');
+      setAssigneeId(undefined);
       setNote('');
       setRows([blankRow()]);
     }
@@ -101,6 +110,8 @@ export function ExpectDeliverySheet({
       donorName: donorName.trim(),
       kind,
       expectedDate,
+      mode,
+      assigneeId,
       note: note.trim() || undefined,
       items,
     });
@@ -127,6 +138,8 @@ export function ExpectDeliverySheet({
                 onClick={() => {
                   setDonorName(donor.name);
                   setKind(donor.kind);
+                  // Catering surplus is almost always our trip out to collect.
+                  setMode(donor.kind === 'catering' ? 'we_go' : 'they_come');
                 }}
               >
                 {donor.name}
@@ -161,6 +174,56 @@ export function ExpectDeliverySheet({
               placeholder="e.g. by 3pm"
               className={cn(inputClass, 'h-11 flex-1 min-w-[8rem]')}
             />
+          </div>
+        </Field>
+
+        <Field label="The trip — who moves it?">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <span className="inline-flex rounded-lg border border-zinc-300 bg-zinc-100 p-0.5">
+              {(
+                [
+                  ['they_come', 'They drop off'],
+                  ['we_go', 'We pick up'],
+                ] as [TransportMode, string][]
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  onClick={() => setMode(value)}
+                  className={cn(
+                    'h-9 rounded-md px-3 text-sm font-medium transition-colors',
+                    mode === value
+                      ? 'bg-white text-zinc-950 shadow-sm ring-1 ring-black/5'
+                      : 'text-zinc-500 hover:text-zinc-800',
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </span>
+
+            <span className="inline-flex items-center gap-1.5">
+              <span className="eyebrow text-[10px] font-bold text-zinc-400">
+                {mode === 'we_go' ? 'Driver' : 'Receiver'}
+              </span>
+              {team.map((t) => {
+                const active = t.id === assigneeId;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => setAssigneeId(active ? undefined : t.id)}
+                    className={cn(
+                      'flex h-9 items-center gap-1.5 rounded-full border pl-1.5 pr-3 text-xs font-medium transition-colors',
+                      active
+                        ? 'border-zinc-950 bg-zinc-950 text-white'
+                        : 'border-zinc-300 text-zinc-600 hover:border-zinc-500',
+                    )}
+                  >
+                    <TeamAvatar id={t.id} name={t.name} size={20} />
+                    {t.name.split(' ')[0]}
+                  </button>
+                );
+              })}
+            </span>
           </div>
         </Field>
 

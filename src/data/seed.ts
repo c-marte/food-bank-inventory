@@ -5,9 +5,11 @@ import type {
   DeliveryKind,
   InventoryLot,
   ISODate,
+  OutboundMovement,
   Partner,
   PerishTier,
-  PickupRequest,
+  TeamMember,
+  TransportMode,
 } from '../domain/types';
 import { DEFAULT_CONFIG } from '../domain/config';
 import { inferTier } from '../domain/tier';
@@ -75,7 +77,17 @@ const SEED_LOTS: SeedLot[] = [
 export const SEED_PARTNERS: Partner[] = [
   { id: 'partner-1', name: 'Northside Community Kitchen', kind: 'meal_program' },
   { id: 'partner-2', name: 'Hope Street Shelter', kind: 'meal_program' },
-  { id: 'partner-3', name: 'Neighborhood Families', kind: 'family' },
+  // Family recipients: first name + initial only — client identity is guarded.
+  { id: 'partner-3', name: 'Rosa M.', kind: 'family' },
+  { id: 'partner-4', name: 'James T.', kind: 'family' },
+];
+
+/** The people who own trips — who drives, who receives, who packs, who calls.
+ *  A name on a task is data, not auth: no accounts, no scheduling. */
+export const SEED_TEAM: TeamMember[] = [
+  { id: 'team-1', name: 'Maya Chen' },
+  { id: 'team-2', name: 'Dan Ruiz' },
+  { id: 'team-3', name: 'Jo Park' },
 ];
 
 /** Known donors — offered as one-tap chips when logging an expected delivery,
@@ -100,6 +112,8 @@ interface SeedDelivery {
   donorName: string;
   kind: DeliveryKind;
   when: number; // offset in days from today
+  mode: TransportMode;
+  assigneeId?: string;
   note?: string;
   items: SeedDeliveryItem[];
 }
@@ -107,7 +121,9 @@ interface SeedDelivery {
 // prettier-ignore
 const SEED_DELIVERIES: SeedDelivery[] = [
   {
-    id: 'del-1', donorName: "Sal's Catering", kind: 'catering', when: 0, note: 'by 3pm — event leftovers',
+    // Catering surplus is a WE-GO trip: Maya drives out to collect it.
+    id: 'del-1', donorName: "Sal's Catering", kind: 'catering', when: 0,
+    mode: 'we_go', assigneeId: 'team-1', note: 'pick up by 3pm — event leftovers',
     items: [
       { name: 'Baked Ziti',       category: 'grains',  quantity: 6,  unit: 'trays',      expiry: 2 },
       { name: 'Turkey Sandwiches',category: 'protein', quantity: 24, unit: 'sandwiches', expiry: 1 },
@@ -115,7 +131,9 @@ const SEED_DELIVERIES: SeedDelivery[] = [
     ],
   },
   {
-    id: 'del-2', donorName: 'Stop & Shop', kind: 'recurring', when: 0, note: 'usual morning drop',
+    // The grocery rescue drops off; Jo is on the dock to receive it.
+    id: 'del-2', donorName: 'Stop & Shop', kind: 'recurring', when: 0,
+    mode: 'they_come', assigneeId: 'team-3', note: 'usual morning drop',
     items: [
       { name: 'Wheat Bread',      category: 'grains',  quantity: 12, unit: 'loaves',  expiry: 3, tier: 'fresh' },
       { name: 'Bananas',          category: 'produce', quantity: 15, unit: 'bunches', expiry: 4 },
@@ -127,7 +145,8 @@ const SEED_DELIVERIES: SeedDelivery[] = [
 export interface SeedData {
   lots: InventoryLot[];
   partners: Partner[];
-  requests: PickupRequest[];
+  team: TeamMember[];
+  movements: OutboundMovement[];
   deliveries: Delivery[];
   config: Config;
 }
@@ -145,26 +164,54 @@ export function buildSeed(today: ISODate): SeedData {
     expiryDate: addDays(today, s.expiry),
   }));
 
-  // Two pending requests. Confirming either decrements real lots. They overlap
-  // on Bananas (lot-6) so that confirming one, then the other, demonstrates
-  // partial fulfillment and a shortfall reminder without any extra setup.
-  const requests: PickupRequest[] = [
+  // Three movements in flight — one at each pipeline stage, so the board and
+  // the tile stepper populate on first load:
+  //   mov-1 PACK    — Hope Street's order (born matched from their call),
+  //                   not yet boxed; Maya packs; we'll deliver.
+  //   mov-2 MATCH   — a FEFO-ish grocery box, packed but no taker yet — the
+  //                   "call the list" stage.
+  //   mov-3 HANDOFF — today's deli sandwiches boxed for Northside; Dan drives
+  //                   them over. Completing this decrements (rule 2).
+  const movements: OutboundMovement[] = [
     {
-      id: 'req-1',
-      partnerId: 'partner-1',
-      status: 'requested',
-      items: [
+      id: 'mov-1',
+      lines: [
         { lotId: 'lot-6', quantity: 3 }, // Bananas
         { lotId: 'lot-9', quantity: 2 }, // Whole Milk (expiry +1)
       ],
+      packed: false,
+      recipientId: 'partner-2', // Hope Street Shelter
+      mode: 'we_go',
+      assigneeId: 'team-1', // Maya packs
+      note: 'their weekly order',
+      status: 'open',
+      createdDate: today,
     },
     {
-      id: 'req-2',
-      partnerId: 'partner-2',
-      status: 'requested',
-      items: [
-        { lotId: 'lot-6', quantity: 6 }, // Bananas — overlaps req-1
+      id: 'mov-2',
+      lines: [
+        { lotId: 'lot-3', quantity: 2 }, // Sweet Corn (expiring)
+        { lotId: 'lot-12', quantity: 1 }, // White Rice
+        { lotId: 'lot-15', quantity: 1 }, // Peanut Butter
       ],
+      packed: true,
+      // no recipient — needs a taker: the outreach stage
+      note: 'grocery box — call the family list',
+      status: 'open',
+      createdDate: today,
+    },
+    {
+      id: 'mov-3',
+      lines: [
+        { lotId: 'lot-19', quantity: 6 }, // Deli Sandwiches — die TODAY
+      ],
+      packed: true,
+      recipientId: 'partner-1', // Northside Community Kitchen
+      mode: 'we_go',
+      assigneeId: 'team-2', // Dan drives
+      note: 'drop off by 5pm',
+      status: 'open',
+      createdDate: today,
     },
   ];
 
@@ -177,6 +224,8 @@ export function buildSeed(today: ISODate): SeedData {
     kind: d.kind,
     status: 'expected',
     expectedDate: addDays(today, d.when),
+    mode: d.mode,
+    assigneeId: d.assigneeId,
     note: d.note,
     items: d.items.map((it, j) => ({
       id: `${d.id}-item-${j + 1}`,
@@ -192,7 +241,8 @@ export function buildSeed(today: ISODate): SeedData {
   return {
     lots,
     partners: SEED_PARTNERS,
-    requests,
+    team: SEED_TEAM,
+    movements,
     deliveries,
     config: DEFAULT_CONFIG,
   };

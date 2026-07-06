@@ -220,6 +220,68 @@ export function TierChip({ tier, size = 32 }: { tier: PerishTier; size?: number 
   );
 }
 
+// A fixed palette (not a hash-to-hue) so colors stay visually consistent and
+// legible — deterministic per id, but never a muddy or clashing hue.
+const AVATAR_PALETTE = [
+  'bg-violet-100 text-violet-700',
+  'bg-sky-100 text-sky-700',
+  'bg-rose-100 text-rose-700',
+  'bg-amber-100 text-amber-800',
+  'bg-teal-100 text-teal-700',
+];
+
+function avatarTone(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) | 0;
+  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase();
+}
+
+/**
+ * OUR people — volunteers and staff — get a colored initials circle. This is
+ * the one avatar treatment in the app, and it's deliberately reserved for our
+ * team: partners, donors, and family recipients stay plain text, so a glance
+ * at a colored circle always means "one of ours is on this."
+ */
+export function TeamAvatar({
+  id,
+  name,
+  size = 22,
+}: {
+  id: string;
+  name: string;
+  size?: number;
+}) {
+  return (
+    <span
+      className={cn(
+        'inline-flex shrink-0 items-center justify-center rounded-full font-bold',
+        avatarTone(id),
+      )}
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.4) }}
+      title={name}
+    >
+      {initials(name)}
+    </span>
+  );
+}
+
+/** Avatar + first name, the compact "who owns this" chip used in rows. */
+export function TeamBadge({ id, name }: { id: string; name: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-50 py-0.5 pl-0.5 pr-2 ring-1 ring-zinc-200">
+      <TeamAvatar id={id} name={name} size={18} />
+      <span className="text-[11px] font-medium text-zinc-700">
+        {name.split(' ')[0]}
+      </span>
+    </span>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Layout bits.
 // ---------------------------------------------------------------------------

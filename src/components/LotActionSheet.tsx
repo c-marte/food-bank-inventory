@@ -15,7 +15,7 @@ import { SPRING } from '../ui/motion';
  *
  * Every lot, everywhere it appears, opens this same sheet. Three verbs map to
  * the three physical realities:
- *   move it  → Send to partner (opens Record pickup prefilled; expired never ships)
+ *   move it  → Send to partner (starts a pipeline movement; expired never ships)
  *   pull it  → Mark as waste (partial allowed; records a WasteEvent)
  *   fix it   → Adjust quantity (the correction)
  * ───────────────────────────────────────────────────────── */
@@ -100,7 +100,7 @@ export function LotActionSheet({
                     ? 'Expired food never ships.'
                     : empty
                       ? 'Nothing left to send.'
-                      : 'Record a pickup with this lot pre-selected.'
+                      : 'Start a movement with this lot pre-selected.'
                 }
                 disabled={expired || empty}
                 emphasis

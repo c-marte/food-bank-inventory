@@ -103,53 +103,77 @@ distribution).
 
 - **Shelf** (`Home`) — one urgent headline, then a **two-tile summary**
   (`FlowTiles`): **Food In** / **Food Out**, side by side. Each tile is
-  self-contained — a hero count, one status line naming the soonest thing, and
-  a primary action (*Receive* / *Distribute*) that either acts directly or taps
-  through to its full surface; a quick-add link underneath (*walk-in*, *partner
-  request*) covers the exception path. `TriageBar` stays headline-only — one
+  self-contained — real counts, one status line naming WHO and the soonest
+  thing, a visual anchor, and a primary action that either acts directly or
+  taps through to its full surface. `TriageBar` stays headline-only — one
   elevated fact ("Baby Spinach expires today"), no repeated counts, since those
-  now live on the tiles. (An earlier version tried a flat, decay-generated
-  worklist/checklist — every task in one column, same-size rows; it lost visual
-  grouping and buttons of varying weight competed for attention, so it was
-  replaced with this two-tile split after reviewing dashboard patterns —
-  Greenlight's self-contained tile grid, Revolut's money-in/money-out sections,
-  MyFitnessPal's hero-metric-with-flanking-numbers — on Mobbin.) The rich status
-  — the **decay timeline**, **Move first**, **Low stock** — is one tap away
-  behind **"View the full shelf"** (reference, not the daily driver).
+  live on the tiles. The rich status — the **decay timeline**, **Move first**,
+  **Low stock** — is one tap away behind **"View the full shelf"** (reference,
+  not the daily driver).
 
-  Each tile carries one equal-height visual anchor (`FlowTileVisuals`), same
-  slot, under the status line and above the action row:
-  - **Food In** — a static, non-live **origin → dock map**: a pinned donor
-    name, an abstract dashed route (no fabricated street data — we don't have
-    a donor's real coordinates), and a home glyph for our dock. Modeled on
-    package-tracking UIs (Shop, Klarna), but deliberately **not** a live GPS
-    tracker — we have no real-time position to show, so a moving dot would be
-    a lie the interface tells.
-  - **Food Out** — an **honest aggregate status board**, not a fabricated
-    per-item journey: *Dying now* / *Requested* / *Released today*, three
-    independent, always-true counts in a dot-and-line stepper. A literal
-    multi-stage tracker (Selected → Packed → Ready → Released) was considered
-    and rejected — our domain only has two real states per record (pending,
-    released), so a 4-stage per-item stepper would invent progress that
-    doesn't exist. The aggregate framing (closer to Jira's status tiles) says
-    only what's true.
-- **Intake** (`IntakePage`) — food IN: the two capture paths and the incoming
-  queue (`IncomingDeliveries`).
-- **Distribution** (`PickupsQueue`) — food OUT, **decay-forward** (the outflow
-  mirror of decay-forward intake — the shelf leads instead of waiting for a
-  request):
-  - **Move it out** — dying lots (`getDyingLots`), soonest first; one tap
-    **Sends** to a **meal program** (kitchens only — routed by `Partner.kind`).
-  - **Family box** — the app builds a **FEFO** box (`buildFefoBox`:
-    soonest-expiring groceries, one per category, prepared excluded → it goes to
-    kitchens); **Pack** releases FEFO and tallies households served.
-  - **Partner orders** — standing requests; **Release** confirms them.
-  All paths go through `releaseLots` (immediate, rule 2: decrement, clamped,
-  never ships expired) and log a `DistributionRecord` → the "N households, M lots
-  out today" tally.
+  Each tile carries one equal-height visual anchor (`FlowTileVisuals`):
+  - **Food In** splits into **two real counts — deliveries vs. our pickups —
+    never lumped.** A delivery (the donor drops off) and a pickup (one of ours
+    drives out, e.g. collecting catering surplus) share the same "expected"
+    status but move in opposite directions; merging them into one "N expected"
+    number lied about what was actually about to happen. Below the counts, a
+    static, non-live **origin → dock map**: a pinned donor name, an abstract
+    dashed route (no fabricated street data), a home glyph for our dock, and a
+    direction chip ("DROP-OFF" / "WE PICK UP"). Modeled on package-tracking UIs
+    (Shop, Klarna) but deliberately **not** a live GPS tracker — we have no
+    real-time position, so a moving dot would be a lie the interface tells.
+  - **Food Out** mirrors the outbound **pipeline** (below): a per-stage status
+    board — *Pack / Match / Handoff* — with the owner's name under each stage,
+    not a fabricated single-item journey. A literal 4-node tracker (Selected →
+    Packed → Ready → Released) was considered and rejected first: our domain
+    only has two real states per record before this rework (pending, released),
+    so a 4-stage per-item stepper would have invented progress that didn't
+    exist. Building the real Pack/Match/Handoff pipeline (below) resolved that
+    honestly instead of faking it.
+- **Intake** (`IntakePage`) — food IN, split the same way as the tile:
+  **Deliveries** and **Our pickups** as two labeled lists (`IncomingDeliveries`),
+  each row showing the assigned team member's avatar. The two capture paths
+  (dictate / photo) still feed the promise sheet.
+- **Distribution** (`DistributionPage`) — food OUT as a **pipeline of
+  movements**, not a log of instants:
+
+  ```
+  ① PACK     box it / stage it cold           (owner: packer)
+  ② MATCH    find a taker — call the list     (owner: caller)
+  ③ HANDOFF  they pick up, or we deliver      (owner: driver/receiver)
+  ```
+
+  Stage is **derived** from what's missing (`getMovementStage`), never stored —
+  house rule. Three doors in: a **partner/family request** is born *matched*
+  (the caller told us who); a **decay push** (dying lots, `getDyingLots`) is
+  born *unmatched* — the real "volunteer calls the shelters" moment the old
+  instant-release model skipped entirely; a **FEFO box** (`buildFefoBox`) is
+  born *packed*. Pack and Match **reserve nothing** — consistent with "requests
+  reserve nothing, first-commit-wins." **Completing the handoff is the single
+  commit point** (`completeHandoff`, rule 2): referenced lots decrement,
+  clamped, expired ships 0, shortfall named in the reminder — the outbound
+  mirror of the dock. Recipient kind sets the trip default (kitchens → we
+  deliver; families → pick up here), adjustable per movement. `PickupRequest`
+  and `DistributionRecord` are retired — a request is just a movement born
+  matched, so there's one model for push, box, and order instead of two half
+  models of the same physical reality.
 - **Inventory** (`LotList`) — the ledger (reached from a Shelf card, not the
   top nav): every lot, statuses mixed, an **Expired only** filter, zero-quantity
   kept and de-emphasized.
+
+### People — who owns the trip
+
+A seeded roster (`TeamMember`, `SEED_TEAM`: Maya, Dan, Jo) makes accountability
+visible without auth: every delivery and movement carries an optional
+`assigneeId`. **Our people get one avatar treatment reserved for them** — a
+colored initials circle (`TeamAvatar`/`TeamBadge`, deterministic palette, not a
+hash-to-hue) — so a glance at a colored circle always means "one of ours is on
+this." Partners, donors, and family recipients stay plain text; the contrast is
+the point. Every trip also carries a **`TransportMode`** (`they_come` /
+`we_go`) — the direction of physical movement, since a donation pickup, a
+catering-surplus pickup, a grocery drop-off, and a partner delivery are all the
+"same" event type but opposite directions, and conflating them was the bug
+this fixed.
 
 ### Perishability tiers — the axis the job turns on
 
