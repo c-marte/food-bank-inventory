@@ -19,7 +19,7 @@ import {
   validateRequestItems,
 } from './distribution';
 import { markWaste } from './waste';
-import { categoryDefaultExpiry, receiveDelivery } from './deliveries';
+import { categoryDefaultExpiry, getDeliveryStage, receiveDelivery } from './deliveries';
 import { parseDonation } from './parseDonation';
 import { inferTier } from './tier';
 import { buildSeed } from '../data/seed';
@@ -461,5 +461,34 @@ describe('seed movements populate every pipeline stage', () => {
     }
     // the catering surplus is a we-go trip (a volunteer drives out)
     expect(seed.deliveries.find((d) => d.donorName === "Sal's Catering")!.mode).toBe('we_go');
+  });
+});
+
+describe('getDeliveryStage — derived, honest, three real states', () => {
+  const TODAY = '2026-07-06';
+  function delivery(expectedOffset: number, status: 'expected' | 'received'): Delivery {
+    return {
+      id: 'd1',
+      donorName: 'Test Donor',
+      kind: 'individual',
+      status,
+      expectedDate: addDays(TODAY, expectedOffset),
+      mode: 'they_come',
+      items: [],
+    };
+  }
+
+  it('future expectedDate -> scheduled', () => {
+    expect(getDeliveryStage(delivery(3, 'expected'), TODAY)).toBe('scheduled');
+  });
+  it('expectedDate is today, still expected -> en_route', () => {
+    expect(getDeliveryStage(delivery(0, 'expected'), TODAY)).toBe('en_route');
+  });
+  it('expectedDate already passed, still expected -> en_route (overdue counts as en route)', () => {
+    expect(getDeliveryStage(delivery(-2, 'expected'), TODAY)).toBe('en_route');
+  });
+  it('status received -> received, regardless of date', () => {
+    expect(getDeliveryStage(delivery(5, 'received'), TODAY)).toBe('received');
+    expect(getDeliveryStage(delivery(-5, 'received'), TODAY)).toBe('received');
   });
 });

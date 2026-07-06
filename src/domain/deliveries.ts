@@ -5,7 +5,7 @@ import type {
   InventoryLot,
   ISODate,
 } from './types';
-import { addDays } from './dates';
+import { addDays, daysUntil } from './dates';
 import { inferTier } from './tier';
 
 // ---------------------------------------------------------------------------
@@ -37,6 +37,25 @@ export function categoryDefaultExpiry(
   today: ISODate,
 ): ISODate {
   return addDays(today, SHELF_LIFE_DAYS[category]);
+}
+
+/** The three real, honest stages of a delivery's journey — derived from
+ *  expectedDate vs. today and status, never stored (house rule, same as the
+ *  Pack/Match/Handoff pipeline). No fabricated "preparing"/"out for delivery"
+ *  granularity — we only actually know three things: it hasn't happened yet,
+ *  it's due today, or it's done.
+ *   scheduled  — expectedDate is still in the future
+ *   en_route   — expectedDate has arrived (today or overdue) but not received
+ *   received   — status is 'received'
+ */
+export type DeliveryStage = 'scheduled' | 'en_route' | 'received';
+
+export function getDeliveryStage(
+  delivery: Delivery,
+  today: ISODate,
+): DeliveryStage {
+  if (delivery.status === 'received') return 'received';
+  return daysUntil(delivery.expectedDate, today) > 0 ? 'scheduled' : 'en_route';
 }
 
 /** Build a fresh draft line for the promise / dock editors. */

@@ -36,6 +36,15 @@ What remains is one operating surface for the person who holds the shelves:
 **one surface, two mutations (food in, food out), one clock.** In production,
 sign-in would land the shelf-keeper here directly — there is no role UI to fake.
 
+**A second narrowing, later in the build:** three goals in a 3-hour design
+exercise (tracking donations, managing stock, coordinating pickups) forces
+shallow coverage everywhere. Food In — the two real intake shapes, **they come
+to us** (a delivery) and **we go to them** (a pickup, e.g. collecting catering
+surplus) — is where the remaining depth went: a real interactive map, a
+derived arrival stepper, hover-driven layout. The Food Out pipeline
+(Pack/Match/Handoff) stays as a working, tested slice; it just isn't where
+further polish is invested.
+
 ## The 60-second demo
 
 1. **Log donation** (header) → name, tap a category chip, quick-set an expiry
@@ -134,21 +143,36 @@ distribution).
     as its content changes, keeping the rows mirrored underneath it too.
   - **Visual anchor** — `flex-1`, so it absorbs whatever height difference is
     left once the rows above it are equal, and both tiles end up the same
-    overall height automatically (no manual height math). Food In:
-    `DeliveryOriginMap`, a static, non-live **origin → dock illustration** — a
-    pinned donor name, an abstract dashed route (no fabricated street data), a
-    home glyph, a direction chip ("DROP-OFF" / "WE PICK UP"). Modeled on
-    package-tracking UIs (Shop, Klarna) but deliberately **not** live GPS — we
-    have no real-time position, so a moving dot would be a lie the interface
-    tells. Food Out: `OutboundStatusBoard`, now just the **Pack → Match →
-    Handoff connector** (dot-line-dot, owner names underneath) — the counts
-    moved to the KPI row above, so nothing is shown twice. A literal 4-node
-    per-item tracker (Selected → Packed → Ready → Released) was considered
-    and rejected first: our domain only has two real states per record
-    (pending, released), so a 4-stage per-item stepper would have invented
-    progress that didn't
-    exist. Building the real Pack/Match/Handoff pipeline (below) resolved that
-    honestly instead of faking it.
+    overall height automatically (no manual height math). Food Out:
+    `OutboundStatusBoard`, the **Pack → Match → Handoff connector**
+    (dot-line-dot, owner names underneath) — the counts live in the KPI row
+    above, so nothing is shown twice. A literal 4-node per-item tracker
+    (Selected → Packed → Ready → Released) was considered and rejected first:
+    our domain only has two real states per record (pending, released), so a
+    4-stage per-item stepper would have invented progress that didn't exist —
+    the real Pack/Match/Handoff pipeline (below) resolved that honestly
+    instead of faking it. Food In: `DeliveryTrackerMap` — a **real, interactive
+    Leaflet + OpenStreetMap map** (draggable, zoomable, no API key — the same
+    no-key approach a production app like Shopee credits on its own tracking
+    screen) with a **3-stage derived stepper** above it (`getDeliveryStage`:
+    Scheduled → En route → Received, from `expectedDate` vs. `today` and
+    `status` — never stored, same house rule as the Pack/Match/Handoff
+    pipeline). Two honest, static pins (the donor, our dock — seeded
+    coordinates in `data/geo.ts`) joined by a straight dashed connector,
+    **explicitly not a routed path or a live courier position** — we have no
+    real-time GPS, so a moving vehicle icon would be a lie the interface
+    tells. Captions are calendar dates ("Expected Jul 6"), never clock times —
+    this app tracks days, not hours, by design from the very first commit.
+  - **Hover-driven width** — hovering the Food In map (not the whole tile)
+    grows its grid column (`grid-cols-[var(--in-fr)_var(--out-fr)]`, CSS
+    variables driven by hover state, transitioned); Food Out narrows and
+    gracefully truncates/wraps-and-clips (`overflow-hidden` on the fixed-height
+    metadata row, `truncate` on KPI labels) rather than changing height —
+    plain CSS responding to whatever width the grid actually gives it, no
+    prop-drilled "compact" state needed. Modeled on the list-widens-map-narrows
+    attention pattern in map+list split views (Walmart, Tripadvisor, OpenTable
+    all use the family; the specific hover-to-grow micro-interaction is this
+    build's own refinement of it).
 - **Intake** (`IntakePage`) — food IN, split the same way as the tile:
   **Deliveries** and **Our pickups** as two labeled lists (`IncomingDeliveries`),
   each row showing the assigned team member's avatar. The two capture paths

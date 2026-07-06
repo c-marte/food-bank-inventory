@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import type { Delivery } from '../domain/types';
 import { daysUntil } from '../domain/dates';
@@ -6,7 +6,8 @@ import { getMovementStage } from '../domain/distribution';
 import { useStore } from '../store/useStore';
 import { useUI } from '../store/useUI';
 import { Button, Card, Icon, TeamBadge, TierMark } from '../ui/primitives';
-import { DeliveryOriginMap, OutboundStatusBoard } from './FlowTileVisuals';
+import { OutboundStatusBoard } from './FlowTileVisuals';
+import { DeliveryTrackerMap } from './DeliveryTrackerMap';
 import { cn } from '../ui/cn';
 import { SPRING } from '../ui/motion';
 
@@ -43,6 +44,11 @@ export function FlowTiles() {
   const { movements, deliveries, partners, team, today } = useStore();
   const { navigate, openReceive, openExpect, openIntake, openPickup } = useUI();
   const [inTab, setInTab] = useState<InTab>('pickup'); // we default to pickups
+  // Hovering the Food In map is where attention is — the column grows, Food
+  // Out's column narrows and gracefully truncates (via CSS, not JS: no need
+  // to thread a "compact" prop through Food Out — truncate/overflow-hidden
+  // just respond to whatever width the grid actually gives them).
+  const [mapHovered, setMapHovered] = useState(false);
 
   const member = (id?: string) => team.find((t) => t.id === id);
 
@@ -73,7 +79,15 @@ export function FlowTiles() {
     [...new Set(ms.map((m) => member(m.assigneeId)?.name.split(' ')[0]).filter(Boolean))].join(', ');
 
   return (
-    <div className="grid items-stretch gap-4 sm:grid-cols-2">
+    <div
+      className="grid items-stretch gap-4 transition-[grid-template-columns] duration-300 ease-out sm:grid-cols-[var(--in-fr)_var(--out-fr)]"
+      style={
+        {
+          '--in-fr': mapHovered ? '1.6fr' : '1fr',
+          '--out-fr': mapHovered ? '1fr' : '1fr',
+        } as CSSProperties
+      }
+    >
       {/* FOOD IN */}
       <Card className="flex h-full flex-col p-4 sm:p-5">
         <TileHeader icon="truck" label="Food in" onClick={() => navigate('intake')} />
@@ -94,8 +108,9 @@ export function FlowTiles() {
           />
         </div>
 
-        {/* Metadata — fixed height regardless of tab. */}
-        <div className={cn('mt-2', METADATA_MIN_H)}>
+        {/* Metadata — fixed height regardless of tab; overflow clips rather
+            than growing the box if content wraps at a narrower width. */}
+        <div className={cn('mt-2 overflow-hidden', METADATA_MIN_H)}>
           {selectedIn ? (
             inTab === 'pickup' ? (
               <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-zinc-600">
@@ -129,16 +144,15 @@ export function FlowTiles() {
           )}
         </div>
 
-        {/* Visual anchor — flex-1, absorbs the leftover height. */}
-        <div className="mt-3 min-h-28 flex-1">
+        {/* Visual anchor — flex-1, absorbs the leftover height. Hovering the
+            map itself is the trigger for the width swap (not the whole tile). */}
+        <div
+          className="mt-3 min-h-28 flex-1"
+          onMouseEnter={() => setMapHovered(true)}
+          onMouseLeave={() => setMapHovered(false)}
+        >
           {selectedIn ? (
-            <DeliveryOriginMap
-              donorName={selectedIn.donorName}
-              outbound={inTab === 'pickup'}
-              timing={
-                selectedIn.note ?? timingLabel(daysUntil(selectedIn.expectedDate, today))
-              }
-            />
+            <DeliveryTrackerMap delivery={selectedIn} today={today} />
           ) : (
             <div className="flex h-full min-h-28 items-center justify-center rounded-xl border border-dashed border-zinc-300 text-xs text-zinc-400">
               {inTab === 'pickup' ? 'No pickup en route' : 'No donor en route'}
@@ -178,8 +192,9 @@ export function FlowTiles() {
           <KpiBlock n={atHandoff.length} label="Handoff" />
         </div>
 
-        {/* Metadata — same fixed height as Food In. */}
-        <div className={cn('mt-2', METADATA_MIN_H)}>
+        {/* Metadata — same fixed height as Food In; clips rather than grows
+            if Food In's hover narrows this column and text wraps more. */}
+        <div className={cn('mt-2 overflow-hidden', METADATA_MIN_H)}>
           <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-zinc-600">
             {nextOut && nextOutRecipient ? (
               <>
@@ -281,14 +296,14 @@ function MetricTab({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        'flex-1 rounded-lg px-2.5 py-1.5 text-left transition-colors',
+        'flex-1 min-w-0 rounded-lg px-2.5 py-1.5 text-left transition-colors',
         active
           ? 'bg-zinc-50 ring-1 ring-zinc-950'
           : 'opacity-50 hover:bg-zinc-50 hover:opacity-100',
       )}
     >
       <Count n={n} />
-      <div className="text-xs text-zinc-500">{label}</div>
+      <div className="truncate text-xs text-zinc-500">{label}</div>
     </button>
   );
 }
@@ -297,9 +312,9 @@ function MetricTab({
  *  tab) and always plain black: no urgency color on the large number. */
 function KpiBlock({ n, label }: { n: number; label: string }) {
   return (
-    <div className="flex-1 rounded-lg px-2.5 py-1.5 text-left">
+    <div className="flex-1 min-w-0 rounded-lg px-2.5 py-1.5 text-left">
       <Count n={n} />
-      <div className="text-xs text-zinc-500">{label}</div>
+      <div className="truncate text-xs text-zinc-500">{label}</div>
     </div>
   );
 }
