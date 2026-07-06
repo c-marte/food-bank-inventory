@@ -50,9 +50,14 @@ export interface InventoryLot {
   expiryDate: ISODate;
 }
 
+/** Where food goes OUT. Prepared/bulk routes to meal programs; groceries go to
+ *  families as boxes. Enables tier-aware routing on the distribution surface. */
+export type PartnerKind = 'meal_program' | 'family';
+
 export interface Partner {
   id: string;
   name: string;
+  kind: PartnerKind;
 }
 
 export interface RequestItem {
@@ -65,6 +70,31 @@ export interface PickupRequest {
   partnerId: string;
   items: RequestItem[];
   status: 'requested' | 'confirmed';
+}
+
+/** A recorded release — food that LEFT the shelf. Immediate (no two-step):
+ *   push  — dying food offered to a meal program (decay-forward)
+ *   box   — a FEFO family box the app built
+ *   order — a standing partner order, released
+ *  Rule 2 lives here too: releasing decrements the referenced lots. */
+export interface DistributionLine {
+  lotId: string;
+  name: string;
+  unit: string;
+  requested: number;
+  released: number; // clamped at what was on hand; 0 if the lot had expired
+}
+
+export interface DistributionRecord {
+  id: string;
+  recipientId: string;
+  recipientName: string;
+  recipientKind: PartnerKind;
+  mode: 'push' | 'box' | 'order';
+  lines: DistributionLine[];
+  /** Households served (family boxes only; 0 otherwise). */
+  households: number;
+  date: ISODate;
 }
 
 /** An incoming donation, captured as a PROMISE before it arrives (the phone

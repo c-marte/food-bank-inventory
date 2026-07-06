@@ -17,6 +17,7 @@ import {
 } from './requests';
 import { markWaste } from './waste';
 import { categoryDefaultExpiry, receiveDelivery } from './deliveries';
+import { buildFefoBox, getDyingLots, releaseLots } from './distribution';
 import { parseDonation } from './parseDonation';
 import { inferTier } from './tier';
 import { buildSeed } from '../data/seed';
@@ -136,7 +137,7 @@ describe('partner availability', () => {
 });
 
 describe('confirmRequest — rule 2: confirm decrements', () => {
-  const partners: Partner[] = [{ id: 'partner-1', name: 'Northside' }];
+  const partners: Partner[] = [{ id: 'partner-1', name: 'Northside', kind: 'meal_program' }];
 
   it('decrements referenced lots and queues a clean reminder', () => {
     const lots = [lot({ id: 'l1', name: 'Beans', quantity: 10 })];
@@ -366,5 +367,73 @@ describe('parseDonation', () => {
   it('defaults a missing count to 1 and returns [] for empty input', () => {
     expect(parseDonation('bananas', TODAY)[0]).toMatchObject({ name: 'Bananas', quantity: 1, category: 'produce' });
     expect(parseDonation('   ', TODAY)).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Distribution — food out, decay-forward. Release decrements immediately.
+// ---------------------------------------------------------------------------
+describe('distribution — dying lots, FEFO box, release', () => {
+  const kitchen: Partner = { id: 'p1', name: 'Northside', kind: 'meal_program' };
+  const family: Partner = { id: 'p3', name: 'Neighborhood Families', kind: 'family' };
+  let n = 0;
+  const makeId = () => `dist-${++n}`;
+
+  it('getDyingLots: only expiring_soon with qty > 0, soonest first', () => {
+    const lots = [
+      lot({ id: 'ok', tier: 'fresh', expiryDate: addDays(TODAY, 30) }),
+      lot({ id: 'exp', tier: 'fresh', expiryDate: addDays(TODAY, -1) }),
+      lot({ id: 'zero', tier: 'fresh', quantity: 0, expiryDate: addDays(TODAY, 1) }),
+      lot({ id: 'soon3', tier: 'fresh', expiryDate: addDays(TODAY, 3) }),
+      lot({ id: 'soon1', tier: 'fresh', expiryDate: addDays(TODAY, 1) }),
+    ];
+    expect(getDyingLots(lots, TODAY, CONFIG).map((l) => l.id)).toEqual(['soon1', 'soon3']);
+  });
+
+  it('buildFefoBox: soonest-expiring groceries, one per category, no prepared/expired', () => {
+    const lots = [
+      lot({ id: 'prep', category: 'grains', tier: 'prepared', expiryDate: addDays(TODAY, 1) }),
+      lot({ id: 'expd', category: 'dairy', tier: 'fresh', expiryDate: addDays(TODAY, -1) }),
+      lot({ id: 'prod1', category: 'produce', tier: 'fresh', expiryDate: addDays(TODAY, 2) }),
+      lot({ id: 'prod2', category: 'produce', tier: 'fresh', expiryDate: addDays(TODAY, 4) }),
+      lot({ id: 'dairy', category: 'dairy', tier: 'fresh', expiryDate: addDays(TODAY, 3) }),
+    ];
+    const box = buildFefoBox(lots, TODAY, CONFIG);
+    // prod1 (soonest produce) + dairy; prod2 skipped (produce taken), prep/expd excluded
+    expect(box.map((i) => i.lotId)).toEqual(['prod1', 'dairy']);
+    expect(box.every((i) => i.quantity === 1)).toBe(true);
+  });
+
+  it('releaseLots decrements (clamped), logs the record, and never ships expired', () => {
+    n = 0;
+    const lots = [
+      lot({ id: 'l1', name: 'Ziti', quantity: 6 }),
+      lot({ id: 'l2', name: 'Milk', quantity: 4, expiryDate: addDays(TODAY, -1) }), // expired
+    ];
+    const res = releaseLots(
+      kitchen, 'push',
+      [{ lotId: 'l1', quantity: 8 }, { lotId: 'l2', quantity: 2 }],
+      0, lots, TODAY, makeId,
+    );
+    expect(res.lots.find((l) => l.id === 'l1')!.quantity).toBe(0); // max(0, 6-8)
+    expect(res.lots.find((l) => l.id === 'l2')!.quantity).toBe(4); // expired, untouched
+    expect(res.distribution.lines.find((x) => x.lotId === 'l2')!.released).toBe(0);
+    expect(res.reminder).toMatch(/notify Northside — released with shortages: Ziti \(6 of 8\)/);
+  });
+
+  it('family release uses a box-packed reminder and records households', () => {
+    n = 0;
+    const lots = [lot({ id: 'l1', name: 'Bananas', quantity: 10 })];
+    const res = releaseLots(family, 'box', [{ lotId: 'l1', quantity: 1 }], 1, lots, TODAY, makeId);
+    expect(res.reminder).toBe('Family box packed — 1 item off the shelf.');
+    expect(res.distribution.households).toBe(1);
+    expect(res.lots[0].quantity).toBe(9);
+  });
+
+  it('does not mutate the input lots array', () => {
+    n = 0;
+    const lots = [lot({ id: 'l1', quantity: 5 })];
+    releaseLots(kitchen, 'push', [{ lotId: 'l1', quantity: 2 }], 0, lots, TODAY, makeId);
+    expect(lots[0].quantity).toBe(5);
   });
 });

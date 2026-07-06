@@ -73,8 +73,9 @@ const SEED_LOTS: SeedLot[] = [
 ];
 
 export const SEED_PARTNERS: Partner[] = [
-  { id: 'partner-1', name: 'Northside Community Kitchen' },
-  { id: 'partner-2', name: 'Hope Street Shelter' },
+  { id: 'partner-1', name: 'Northside Community Kitchen', kind: 'meal_program' },
+  { id: 'partner-2', name: 'Hope Street Shelter', kind: 'meal_program' },
+  { id: 'partner-3', name: 'Neighborhood Families', kind: 'family' },
 ];
 
 /** Known donors — offered as one-tap chips when logging an expected delivery,

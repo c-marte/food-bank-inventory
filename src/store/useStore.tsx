@@ -10,6 +10,7 @@ import type {
   Config,
   Delivery,
   DeliveryItem,
+  DistributionRecord,
   InventoryLot,
   ISODate,
   Partner,
@@ -22,6 +23,10 @@ import { buildSeed } from '../data/seed';
 import { confirmRequest as domainConfirmRequest } from '../domain/requests';
 import { markWaste as domainMarkWaste } from '../domain/waste';
 import { receiveDelivery as domainReceiveDelivery } from '../domain/deliveries';
+import {
+  releaseLots as domainReleaseLots,
+  type ReleaseItem,
+} from '../domain/distribution';
 
 // ---------------------------------------------------------------------------
 // The single client-side store. One surface, one user (the shelf-keeper), two
@@ -35,6 +40,7 @@ interface StoreState {
   lots: InventoryLot[];
   requests: PickupRequest[];
   deliveries: Delivery[];
+  distributions: DistributionRecord[];
   partners: Partner[];
   wasteEvents: WasteEvent[];
   config: Config;
@@ -50,6 +56,13 @@ type Action =
   | { type: 'MARK_WASTE'; lotId: string; quantity: number; eventId: string }
   | { type: 'ADD_DELIVERY'; delivery: Delivery }
   | { type: 'RECEIVE_DELIVERY'; deliveryId: string; items: DeliveryItem[] }
+  | {
+      type: 'RELEASE';
+      recipientId: string;
+      mode: DistributionRecord['mode'];
+      items: ReleaseItem[];
+      households: number;
+    }
   | { type: 'DISMISS_REMINDER' }
   | { type: 'RESET' };
 
@@ -59,6 +72,7 @@ function freshState(today: ISODate): StoreState {
     lots: seed.lots,
     requests: seed.requests,
     deliveries: seed.deliveries,
+    distributions: [],
     partners: seed.partners,
     wasteEvents: [],
     config: seed.config,
@@ -153,6 +167,28 @@ function reducer(state: StoreState, action: Action): StoreState {
       };
     }
 
+    case 'RELEASE': {
+      // Rule 2 for immediate outflow (push / FEFO box / order): decrement the
+      // referenced lots and log what left.
+      const recipient = state.partners.find((p) => p.id === action.recipientId);
+      if (!recipient) return state;
+      const res = domainReleaseLots(
+        recipient,
+        action.mode,
+        action.items,
+        action.households,
+        state.lots,
+        state.today,
+        () => crypto.randomUUID(),
+      );
+      return {
+        ...state,
+        lots: res.lots,
+        distributions: [...state.distributions, res.distribution],
+        lastReminder: res.reminder,
+      };
+    }
+
     case 'DISMISS_REMINDER':
       return { ...state, lastReminder: null };
 
@@ -164,13 +200,19 @@ function reducer(state: StoreState, action: Action): StoreState {
   }
 }
 
-const STORAGE_KEY = 'food-bank-inventory:v4';
+const STORAGE_KEY = 'food-bank-inventory:v5';
 
 interface PersistShape {
   today: ISODate;
   data: Pick<
     StoreState,
-    'lots' | 'requests' | 'deliveries' | 'partners' | 'wasteEvents' | 'config'
+    | 'lots'
+    | 'requests'
+    | 'deliveries'
+    | 'distributions'
+    | 'partners'
+    | 'wasteEvents'
+    | 'config'
   >;
 }
 
@@ -185,6 +227,7 @@ function loadInitial(today: ISODate): StoreState {
         return {
           ...saved.data,
           deliveries: saved.data.deliveries ?? [],
+          distributions: saved.data.distributions ?? [],
           wasteEvents: saved.data.wasteEvents ?? [],
           today,
           lastReminder: null,
@@ -205,6 +248,12 @@ interface StoreValue extends StoreState {
   markWaste: (lotId: string, quantity: number) => void;
   addDelivery: (delivery: Omit<Delivery, 'id' | 'status'>) => void;
   receiveDelivery: (deliveryId: string, items: DeliveryItem[]) => void;
+  release: (
+    recipientId: string,
+    mode: DistributionRecord['mode'],
+    items: ReleaseItem[],
+    households?: number,
+  ) => void;
   dismissReminder: () => void;
   reset: () => void;
 }
@@ -224,6 +273,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         lots: state.lots,
         requests: state.requests,
         deliveries: state.deliveries,
+        distributions: state.distributions,
         partners: state.partners,
         wasteEvents: state.wasteEvents,
         config: state.config,
@@ -270,6 +320,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }),
     receiveDelivery: (deliveryId, items) =>
       dispatch({ type: 'RECEIVE_DELIVERY', deliveryId, items }),
+    release: (recipientId, mode, items, households = 0) =>
+      dispatch({ type: 'RELEASE', recipientId, mode, items, households }),
     dismissReminder: () => dispatch({ type: 'DISMISS_REMINDER' }),
     reset: () => dispatch({ type: 'RESET' }),
   };
