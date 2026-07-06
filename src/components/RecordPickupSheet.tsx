@@ -29,7 +29,9 @@ export function RecordPickupSheet({
   initialLotId?: string | null;
 }) {
   const { lots, partners, today, config, createRequest } = useStore();
-  const [partnerId, setPartnerId] = useState(partners[0]?.id ?? '');
+  // Orders come from meal programs / agencies; families don't order ahead.
+  const orderPartners = partners.filter((p) => p.kind === 'meal_program');
+  const [partnerId, setPartnerId] = useState(orderPartners[0]?.id ?? '');
   const [sel, setSel] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
 
@@ -41,7 +43,7 @@ export function RecordPickupSheet({
         : undefined;
       setSel(prefill && prefill.quantity > 0 ? { [prefill.id]: prefill.quantity } : {});
       setError(null);
-      setPartnerId(partners[0]?.id ?? '');
+      setPartnerId(orderPartners[0]?.id ?? '');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialLotId, partners]);
@@ -67,7 +69,7 @@ export function RecordPickupSheet({
       <div className="space-y-5">
         <Field label="Partner">
           <div className="flex flex-wrap gap-2">
-            {partners.map((p) => (
+            {orderPartners.map((p) => (
               <Chip
                 key={p.id}
                 selected={partnerId === p.id}

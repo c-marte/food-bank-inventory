@@ -110,8 +110,18 @@ distribution).
   Three summary cards jump to Intake / Distribution / Inventory.
 - **Intake** (`IntakePage`) — food IN: the two capture paths and the incoming
   queue (`IncomingDeliveries`).
-- **Distribution** (`PickupsQueue`) — food OUT: partner requests; **Release**
-  decrements (rule 2), partial fulfillment named in the reminder.
+- **Distribution** (`PickupsQueue`) — food OUT, **decay-forward** (the outflow
+  mirror of decay-forward intake — the shelf leads instead of waiting for a
+  request):
+  - **Move it out** — dying lots (`getDyingLots`), soonest first; one tap
+    **Sends** to a **meal program** (kitchens only — routed by `Partner.kind`).
+  - **Family box** — the app builds a **FEFO** box (`buildFefoBox`:
+    soonest-expiring groceries, one per category, prepared excluded → it goes to
+    kitchens); **Pack** releases FEFO and tallies households served.
+  - **Partner orders** — standing requests; **Release** confirms them.
+  All paths go through `releaseLots` (immediate, rule 2: decrement, clamped,
+  never ships expired) and log a `DistributionRecord` → the "N households, M lots
+  out today" tally.
 - **Inventory** (`LotList`) — the ledger (reached from a Shelf card, not the
   top nav): every lot, statuses mixed, an **Expired only** filter, zero-quantity
   kept and de-emphasized.
