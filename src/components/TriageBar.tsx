@@ -1,26 +1,20 @@
 import { AnimatePresence, motion } from 'motion/react';
 import { daysUntil } from '../domain/dates';
 import { getLotStatus } from '../domain/status';
-import { getExpiringZoneLots, getLowStockZone } from '../domain/dashboard';
+import { getExpiringZoneLots } from '../domain/dashboard';
 import { useStore } from '../store/useStore';
 import { useUI } from '../store/useUI';
 import { Card, Icon } from '../ui/primitives';
-import { cn } from '../ui/cn';
 import { SPRING } from '../ui/motion';
 
 /**
- * The focusing layer. Above the two zones, it answers "what do I touch first?"
- * with one elevated headline, then summarizes the whole shelf as a strip of
- * counts. Everything is derived at render from the same pure functions the
- * zones use — no new state.
+ * The focusing layer — one elevated headline answering "what do I touch
+ * first?" Counts live on the Food In / Food Out tiles below, so this stays a
+ * single fact, never a repeated tally.
  */
 export function TriageBar() {
-  const { lots, requests, deliveries, today, config } = useStore();
+  const { lots, today, config } = useStore();
   const { openLot, navigate, setExpiredOnly } = useUI();
-
-  const arrivingToday = deliveries.filter(
-    (d) => d.status === 'expected' && d.expectedDate <= today,
-  ).length;
 
   const goToExpired = () => {
     setExpiredOnly(true);
@@ -31,8 +25,6 @@ export function TriageBar() {
   const expired = lots.filter(
     (l) => l.quantity > 0 && getLotStatus(l, today, config) === 'expired',
   );
-  const low = getLowStockZone(lots, today, config);
-  const pending = requests.filter((r) => r.status === 'requested');
 
   const mostUrgent = expiring[0];
   const d = mostUrgent ? daysUntil(mostUrgent.expiryDate, today) : null;
@@ -111,89 +103,6 @@ export function TriageBar() {
           </motion.div>
         </AnimatePresence>
       </div>
-
-      {/* State-of-the-shelf strip. Counts with a destination are tappable. */}
-      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-zinc-100 pt-3">
-        {arrivingToday > 0 && (
-          <Stat
-            n={arrivingToday}
-            label="arriving today"
-            tone="zinc"
-            onClick={() => navigate('intake')}
-          />
-        )}
-        <Stat n={expiring.length} label="expiring soon" tone="amber" />
-        {expired.length > 0 && (
-          <Stat
-            n={expired.length}
-            label="already expired"
-            tone="red"
-            onClick={goToExpired}
-          />
-        )}
-        <Stat n={low.length} label={low.length === 1 ? 'category low' : 'categories low'} tone="amber" />
-        <Stat
-          n={pending.length}
-          label={pending.length === 1 ? 'to release' : 'to release'}
-          tone="zinc"
-          onClick={() => navigate('distribution')}
-        />
-      </div>
     </Card>
-  );
-}
-
-const TONE_DOT: Record<'amber' | 'red' | 'zinc', string> = {
-  amber: 'bg-amber-500',
-  red: 'bg-red-600',
-  zinc: 'bg-zinc-400',
-};
-
-function Stat({
-  n,
-  label,
-  tone,
-  onClick,
-}: {
-  n: number;
-  label: string;
-  tone: 'amber' | 'red' | 'zinc';
-  onClick?: () => void;
-}) {
-  const inner = (
-    <>
-      <span className={cn('h-2 w-2 shrink-0 rounded-full', TONE_DOT[tone])} aria-hidden />
-      <span className="relative inline-flex h-6 min-w-[1.25rem] items-center justify-center">
-        <AnimatePresence mode="popLayout" initial={false}>
-          <motion.span
-            key={n}
-            initial={{ opacity: 0, y: 7 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -7 }}
-            transition={SPRING.pop}
-            className="nums text-lg font-bold text-zinc-950"
-          >
-            {n}
-          </motion.span>
-        </AnimatePresence>
-      </span>
-      <span className="text-sm text-zinc-500">{label}</span>
-    </>
-  );
-
-  if (!onClick) return <div className="flex items-center gap-2 px-1">{inner}</div>;
-
-  return (
-    <button
-      onClick={onClick}
-      className="group flex items-center gap-2 rounded-md px-1 py-0.5 transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950"
-    >
-      {inner}
-      <Icon
-        name="chevron"
-        size={14}
-        className="-ml-0.5 text-zinc-300 transition-transform group-hover:translate-x-0.5 group-hover:text-zinc-500"
-      />
-    </button>
   );
 }

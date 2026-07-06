@@ -1,38 +1,24 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useUI } from '../store/useUI';
-import { TodayWorklist } from './TodayWorklist';
+import { TriageBar } from './TriageBar';
+import { FlowTiles } from './FlowTiles';
 import { DecayTimeline } from './DecayTimeline';
 import { MoveFirstZone } from './MoveFirstZone';
 import { LowStockZone } from './LowStockZone';
-import { Button, Icon } from '../ui/primitives';
+import { Icon } from '../ui/primitives';
 import { cn } from '../ui/cn';
 import { SPRING } from '../ui/motion';
 
-/** Shelf = "Today": a decay-generated worklist you clear, not a dashboard you
- *  parse. Proactive entry points sit in a slim action row; the rich status
- *  (timeline + zones) is one tap away behind "View the full shelf". */
+/** Shelf home: one urgent headline (Act first), then the two-tile summary —
+ *  Food In / Food Out — each self-contained with its own action. The rich
+ *  status (timeline + zones) is one tap away behind "View the full shelf". */
 export function Home() {
-  const { openIntake, openPickup, openExpect } = useUI();
   const [showShelf, setShowShelf] = useState(false);
 
   return (
     <div className="space-y-4">
-      {/* Proactive entry points — the two verbs; walk-in demoted to ghost. */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Button size="lg" onClick={openExpect}>
-          <Icon name="inbox" size={16} /> Expect a delivery
-        </Button>
-        <Button size="lg" variant="outline" onClick={() => openPickup()}>
-          <Icon name="arrow" size={16} /> Log a request
-        </Button>
-        <Button size="lg" variant="ghost" onClick={openIntake}>
-          <Icon name="plus" size={16} /> Walk-in
-        </Button>
-      </div>
-
-      {/* The hero: the ranked list of what to do today. */}
-      <TodayWorklist />
+      <TriageBar />
+      <FlowTiles />
 
       {/* The full picture, on demand. */}
       <div>

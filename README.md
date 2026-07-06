@@ -101,18 +101,21 @@ match destination count). "Pickup" was **retired** — it's directionally
 ambiguous (a volunteer picks up *from* a vendor = intake; a partner picks up =
 distribution).
 
-- **Shelf** (`Home`) = **"Today"** (`TodayWorklist`) — not a dashboard you
-  parse, but a **decay-generated worklist you clear.** The home is a ranked
-  list of what to *do* today, derived from the clock + both flows, with the
-  verb inline: 🔥 *Send N sandwiches to a meal program (dies today)*, 🚚 *Receive
-  Sal's Catering*, ❄ *Pack a family box (FEFO)*, → *Release order to Northside*,
-  🗑 *Pull 2 expired lots*. Ranked by urgency (send-today → receive → box →
-  release → pull); completed work **recedes** into "Done today"; the list is
-  live (receiving prepared food instantly spawns "send it out" tasks). A slim
-  action row keeps the proactive entry points. The rich status — the **decay
-  timeline**, **Move first**, **Low stock** — is one tap away behind **"View
-  the full shelf"** (it's reference, not the daily driver). Turns the app from
-  a *look* page into a *do* page.
+- **Shelf** (`Home`) — one urgent headline, then a **two-tile summary**
+  (`FlowTiles`): **Food In** / **Food Out**, side by side. Each tile is
+  self-contained — a hero count, one status line naming the soonest thing, and
+  a primary action (*Receive* / *Distribute*) that either acts directly or taps
+  through to its full surface; a quick-add link underneath (*walk-in*, *partner
+  request*) covers the exception path. `TriageBar` stays headline-only — one
+  elevated fact ("Baby Spinach expires today"), no repeated counts, since those
+  now live on the tiles. (An earlier version tried a flat, decay-generated
+  worklist/checklist — every task in one column, same-size rows; it lost visual
+  grouping and buttons of varying weight competed for attention, so it was
+  replaced with this two-tile split after reviewing dashboard patterns —
+  Greenlight's self-contained tile grid, Revolut's money-in/money-out sections,
+  MyFitnessPal's hero-metric-with-flanking-numbers — on Mobbin.) The rich status
+  — the **decay timeline**, **Move first**, **Low stock** — is one tap away
+  behind **"View the full shelf"** (reference, not the daily driver).
 - **Intake** (`IntakePage`) — food IN: the two capture paths and the incoming
   queue (`IncomingDeliveries`).
 - **Distribution** (`PickupsQueue`) — food OUT, **decay-forward** (the outflow
