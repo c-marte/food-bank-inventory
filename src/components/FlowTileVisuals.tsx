@@ -78,10 +78,10 @@ export function DeliveryOriginMap({
   );
 }
 
-const NODE_TONE: Record<'urgent' | 'normal' | 'calm', { dot: string; num: string }> = {
-  urgent: { dot: 'bg-red-500', num: 'text-red-600' },
-  normal: { dot: 'bg-zinc-900', num: 'text-zinc-950' },
-  calm: { dot: 'bg-emerald-500', num: 'text-emerald-700' },
+const NODE_TONE: Record<'urgent' | 'normal' | 'calm', { dot: string }> = {
+  urgent: { dot: 'bg-red-500' },
+  normal: { dot: 'bg-zinc-900' },
+  calm: { dot: 'bg-emerald-500' },
 };
 
 interface StatusBucket {
@@ -92,26 +92,15 @@ interface StatusBucket {
   tone: 'urgent' | 'normal' | 'calm';
 }
 
-/** Food Out: the real pipeline — Pack → Match → Handoff — as honest per-stage
- *  counts with the owner named under each stage. Each count is a real derived
- *  state (getMovementStage), not a fabricated per-item journey. */
+/** Food Out's visual anchor: the Pack → Match → Handoff connector, mirroring
+ *  the Food In map's role (a graphic, not a number — the counts themselves
+ *  now live in the KPI row above, same as Food In's tabs). Only the small
+ *  stage dots keep semantic color; the "no special color for the large
+ *  number" rule lives in the KPI row, not here. */
 export function OutboundStatusBoard({ buckets }: { buckets: StatusBucket[] }) {
   return (
     <div className="flex h-full min-h-28 flex-col justify-center rounded-xl border border-zinc-200 bg-zinc-50 px-4">
-      <div className="flex items-center justify-between">
-        {buckets.map((b) => (
-          <span
-            key={b.label}
-            className={cn(
-              'nums w-16 text-center text-xl font-bold',
-              b.n > 0 ? NODE_TONE[b.tone].num : 'text-zinc-300',
-            )}
-          >
-            {b.n}
-          </span>
-        ))}
-      </div>
-      <div className="mt-1.5 flex items-center">
+      <div className="flex items-center">
         {buckets.map((b, i) => (
           <span key={b.label} className="flex flex-1 items-center last:flex-none">
             <span

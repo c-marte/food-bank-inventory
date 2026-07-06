@@ -102,45 +102,51 @@ ambiguous (a volunteer picks up *from* a vendor = intake; a partner picks up =
 distribution).
 
 - **Shelf** (`Home`) — one urgent headline, then a **two-tile summary**
-  (`FlowTiles`): **Food In** / **Food Out**, side by side. Each tile is
-  self-contained — real counts, one status line naming WHO and the soonest
-  thing, a visual anchor, and a primary action that either acts directly or
-  taps through to its full surface. `TriageBar` stays headline-only — one
-  elevated fact ("Baby Spinach expires today"), no repeated counts, since those
-  live on the tiles. The rich status — the **decay timeline**, **Move first**,
-  **Low stock** — is one tap away behind **"View the full shelf"** (reference,
-  not the daily driver).
+  (`FlowTiles`): **Food In** / **Food Out**, side by side, **mirrored row for
+  row** so the two cards read as one language: header, KPI, metadata, visual
+  anchor, footer — same structure, same typography, on both sides. `TriageBar`
+  stays headline-only — one elevated fact ("Baby Spinach expires today"), no
+  repeated counts, since those live on the tiles. The rich status — the
+  **decay timeline**, **Move first**, **Low stock** — is one tap away behind
+  **"View the full shelf"** (reference, not the daily driver).
 
-  Both tiles are **flex columns whose heights always match**: the grid uses
-  `items-stretch`, each `Card` is `flex h-full flex-col`, and the visual anchor
-  in the middle is wrapped `flex-1` so it grows or shrinks to absorb whatever
-  height difference the grid enforces — the action row and its quick-add link
-  stay flush at the bottom of both tiles regardless of which one has more
-  content above.
-
-  - **Food In**'s two real counts — **pickups (we go)** vs. **deliveries** —
-    are **tabs, not just labels**. They're never lumped (a delivery is the
-    donor coming to us; a pickup is one of ours driving out — same "expected"
-    status, opposite direction) — but now clicking one also **swaps the
-    metadata and the map below it** to that trip. Pickup is the default tab:
-    "Sal's Catering is ready for pickup [avatar] · pick up by 3pm," map in
-    "WE PICK UP" mode. Switching to Delivery shows the ETA, the donor, and a
-    **cross-check item list** (`CrossCheckItems`: "12 Wheat Bread · 15 Bananas
-    · 6 Whole Milk") so the receiver can verify what arrives against what was
-    promised — and deliberately **no avatar**, since anyone can receive a
-    delivery (only a pickup has one specific person who has to go get it). The
-    map (`FlowTileVisuals.DeliveryOriginMap`) is a static, non-live
-    **origin → dock illustration** — a pinned donor name, an abstract dashed
-    route (no fabricated street data), a home glyph, a direction chip
-    ("DROP-OFF" / "WE PICK UP"). Modeled on package-tracking UIs (Shop, Klarna)
-    but deliberately **not** live GPS — we have no real-time position, so a
-    moving dot would be a lie the interface tells.
-  - **Food Out** mirrors the outbound **pipeline** (below): a per-stage status
-    board — *Pack / Match / Handoff* — with the owner's name under each stage,
-    not a fabricated single-item journey. A literal 4-node tracker (Selected →
-    Packed → Ready → Released) was considered and rejected first: our domain
-    only has two real states per record before this rework (pending, released),
-    so a 4-stage per-item stepper would have invented progress that didn't
+  - **Header** — the tile's title (`TileHeader`) is itself the click-through:
+    hovering "Food in" / "Food out" reveals a chevron and a hover state, and
+    clicking navigates to Intake / Distribution. Replaces a separate "View
+    intake" / "View distribution" link — one affordance instead of two.
+  - **KPI row** — 2 (Food In) or 3 (Food Out) equal-size number+label blocks,
+    identical typography (`Count`, always plain black — no urgency color on a
+    tile's hero number; color is reserved for status elsewhere, like tier
+    marks). Food In's are **tabs** (`MetricTab`): **pickups (we go)** vs.
+    **deliveries**, never lumped (a delivery is the donor coming to us; a
+    pickup is one of ours driving out — same "expected" status, opposite
+    direction), and clicking one swaps the metadata + map below it. Pickup is
+    the default. Food Out's are static (`KpiBlock`) — Pack / Match / Handoff —
+    the same counts that used to live inside the visual anchor, promoted up so
+    both tiles' KPI rows match in structure and height.
+  - **Metadata** — a fixed-height row (`min-h-14`) on both tiles, sized for the
+    tallest case (Food In's delivery tab, which adds a **cross-check item
+    list** — `CrossCheckItems`: "12 Wheat Bread · 15 Bananas · 6 Whole Milk" —
+    so the receiver can verify what arrives against what was promised, and
+    deliberately **no avatar**, since anyone can receive a delivery; only a
+    pickup has one specific person who has to go get it, so pickup keeps its
+    `TeamBadge`). Fixed height means neither tile's metadata row changes size
+    as its content changes, keeping the rows mirrored underneath it too.
+  - **Visual anchor** — `flex-1`, so it absorbs whatever height difference is
+    left once the rows above it are equal, and both tiles end up the same
+    overall height automatically (no manual height math). Food In:
+    `DeliveryOriginMap`, a static, non-live **origin → dock illustration** — a
+    pinned donor name, an abstract dashed route (no fabricated street data), a
+    home glyph, a direction chip ("DROP-OFF" / "WE PICK UP"). Modeled on
+    package-tracking UIs (Shop, Klarna) but deliberately **not** live GPS — we
+    have no real-time position, so a moving dot would be a lie the interface
+    tells. Food Out: `OutboundStatusBoard`, now just the **Pack → Match →
+    Handoff connector** (dot-line-dot, owner names underneath) — the counts
+    moved to the KPI row above, so nothing is shown twice. A literal 4-node
+    per-item tracker (Selected → Packed → Ready → Released) was considered
+    and rejected first: our domain only has two real states per record
+    (pending, released), so a 4-stage per-item stepper would have invented
+    progress that didn't
     exist. Building the real Pack/Match/Handoff pipeline (below) resolved that
     honestly instead of faking it.
 - **Intake** (`IntakePage`) — food IN, split the same way as the tile:

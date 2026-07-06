@@ -13,12 +13,17 @@ import { SPRING } from '../ui/motion';
 /* ─────────────────────────────────────────────────────────
  * FLOW TILES — the home's two-tile summary.
  *
- * Food In and Food Out are the two operational verbs; each tile is a
- * self-contained glance. Food In's two metrics (Pickups / Deliveries) are
- * TABS — clicking one swaps the metadata + map below to that trip. Both
- * tiles are flex columns so their visual anchor (map / status board) grows
- * to fill whatever height the grid gives them, and the action row always
- * sits flush at the bottom — the two tiles' heights always match.
+ * Food In and Food Out MIRROR each other row for row — header, KPI, metadata,
+ * visual anchor, footer — so the two cards read as one language and always
+ * match height. Each row uses identical structure/typography on both sides;
+ * only the content differs. Sections:
+ *
+ *   header    — a hoverable label that navigates to the full surface
+ *   KPI       — 2 (Food In) or 3 (Food Out) equal-size number+label blocks
+ *   metadata  — one fixed-height status line (+ optional cross-check items)
+ *   visual    — flex-1, so it absorbs any leftover height and both tiles
+ *               always end up the same overall height
+ *   footer    — full-width primary action, centered secondary link
  * ───────────────────────────────────────────────────────── */
 
 function timingLabel(daysAway: number): string {
@@ -26,6 +31,11 @@ function timingLabel(daysAway: number): string {
   if (daysAway === 1) return 'tomorrow';
   return `in ${daysAway} days`;
 }
+
+// Both metadata sections reserve enough room for the tallest case (the
+// delivery tab's status line + cross-check items), so neither tile's
+// metadata row ever changes height as content changes.
+const METADATA_MIN_H = 'min-h-14';
 
 type InTab = 'pickup' | 'delivery';
 
@@ -35,11 +45,9 @@ export function FlowTiles() {
   const [inTab, setInTab] = useState<InTab>('pickup'); // we default to pickups
 
   const member = (id?: string) => team.find((t) => t.id === id);
-  const firstName = (id?: string) => member(id)?.name.split(' ')[0];
 
   // --- Food in: two DIFFERENT things, never lumped. A delivery is the donor
-  // coming to us; a pickup is one of ours driving out. Same "expected" status,
-  // opposite direction.
+  // coming to us; a pickup is one of ours driving out.
   const expected = deliveries.filter((d) => d.status === 'expected');
   const incomingDeliveries = expected
     .filter((d) => d.mode === 'they_come')
@@ -60,21 +68,18 @@ export function FlowTiles() {
   const nextOutRecipient = partners.find((p) => p.id === nextOut?.recipientId);
   const nextOutDriver = member(nextOut?.assigneeId);
 
-  /** Unique owners at a stage, for the status-board sub-label — first names
-   *  only there (space-constrained); full TeamBadge appears on the "Next" line. */
+  /** Unique owners at a stage, for the visual's sub-label. */
   const stageOwners = (ms: typeof open) =>
-    [...new Set(ms.map((m) => firstName(m.assigneeId)).filter(Boolean))].join(', ');
+    [...new Set(ms.map((m) => member(m.assigneeId)?.name.split(' ')[0]).filter(Boolean))].join(', ');
 
   return (
     <div className="grid items-stretch gap-4 sm:grid-cols-2">
       {/* FOOD IN */}
       <Card className="flex h-full flex-col p-4 sm:p-5">
-        <div className="eyebrow flex items-center gap-1.5 text-[11px] font-bold text-zinc-400">
-          <Icon name="truck" size={13} /> Food in
-        </div>
+        <TileHeader icon="truck" label="Food in" onClick={() => navigate('intake')} />
 
-        {/* Two real metrics as TABS — clicking one swaps the metadata + map. */}
-        <div className="mt-2 flex items-start gap-2">
+        {/* KPI row — 2 clickable tabs. */}
+        <div className="mt-3 flex items-start gap-2">
           <MetricTab
             active={inTab === 'pickup'}
             n={ourPickups.length}
@@ -89,7 +94,8 @@ export function FlowTiles() {
           />
         </div>
 
-        <div className="mt-2 min-h-[2.75rem]">
+        {/* Metadata — fixed height regardless of tab. */}
+        <div className={cn('mt-2', METADATA_MIN_H)}>
           {selectedIn ? (
             inTab === 'pickup' ? (
               <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-zinc-600">
@@ -123,6 +129,7 @@ export function FlowTiles() {
           )}
         </div>
 
+        {/* Visual anchor — flex-1, absorbs the leftover height. */}
         <div className="mt-3 min-h-28 flex-1">
           {selectedIn ? (
             <DeliveryOriginMap
@@ -139,27 +146,21 @@ export function FlowTiles() {
           )}
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-2">
+        {/* Footer — full-width primary, centered secondary. */}
+        <div className="mt-4">
           {selectedIn ? (
-            <Button size="sm" onClick={() => openReceive(selectedIn.id)}>
+            <Button className="w-full" onClick={() => openReceive(selectedIn.id)}>
               <Icon name="inbox" size={14} /> Receive
             </Button>
           ) : (
-            <Button size="sm" variant="outline" onClick={openExpect}>
+            <Button className="w-full" variant="outline" onClick={openExpect}>
               <Icon name="plus" size={14} /> Expect a delivery
             </Button>
           )}
-          <button
-            onClick={() => navigate('intake')}
-            className="inline-flex items-center gap-1 text-xs font-medium text-zinc-500 hover:text-zinc-900"
-          >
-            View intake <Icon name="chevron" size={12} />
-          </button>
         </div>
-
         <button
           onClick={openIntake}
-          className="mt-2 text-xs font-medium text-zinc-400 hover:text-zinc-700"
+          className="mt-2 w-full text-center text-xs font-medium text-zinc-400 hover:text-zinc-700"
         >
           + Log a walk-in donation
         </button>
@@ -167,88 +168,98 @@ export function FlowTiles() {
 
       {/* FOOD OUT */}
       <Card className="flex h-full flex-col p-4 sm:p-5">
-        <div className="eyebrow flex items-center gap-1.5 text-[11px] font-bold text-zinc-400">
-          <Icon name="arrow" size={13} /> Food out
+        <TileHeader icon="arrow" label="Food out" onClick={() => navigate('distribution')} />
+
+        {/* KPI row — 3 static blocks, same size/typography as Food In's tabs,
+            always black (no urgency color on the large number). */}
+        <div className="mt-3 flex items-start gap-2">
+          <KpiBlock n={atPack.length} label="Pack" />
+          <KpiBlock n={atMatch.length} label="Match" />
+          <KpiBlock n={atHandoff.length} label="Handoff" />
         </div>
 
-        <div className="mt-2 flex items-baseline gap-2">
-          <Count n={open.length} tone={atHandoff.length > 0 ? 'urgent' : 'normal'} />
-          <span className="text-sm text-zinc-500">
-            {open.length === 1 ? 'movement in the pipeline' : 'movements in the pipeline'}
-          </span>
+        {/* Metadata — same fixed height as Food In. */}
+        <div className={cn('mt-2', METADATA_MIN_H)}>
+          <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-zinc-600">
+            {nextOut && nextOutRecipient ? (
+              <>
+                <span>Next:</span>
+                <span className="font-medium text-zinc-900">{nextOutRecipient.name}</span>
+                <span>{nextOut.mode === 'we_go' ? '· we deliver' : '· picks up here'}</span>
+                {nextOutDriver && <TeamBadge id={nextOutDriver.id} name={nextOutDriver.name} />}
+                {nextOut.note && <span className="text-zinc-400">· {nextOut.note}</span>}
+              </>
+            ) : atMatch.length > 0 ? (
+              `${atMatch.length} packed ${atMatch.length === 1 ? 'box needs' : 'boxes need'} a taker — call the list`
+            ) : atPack.length > 0 ? (
+              'Orders waiting to be packed.'
+            ) : (
+              'Pipeline is clear.'
+            )}
+          </p>
         </div>
 
-        <p className="mt-1 flex min-h-[1.25rem] flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-zinc-600">
-          {nextOut && nextOutRecipient ? (
-            <>
-              <span>Next:</span>
-              <span className="font-medium text-zinc-900">
-                {nextOutRecipient.name}
-              </span>
-              <span>{nextOut.mode === 'we_go' ? '· we deliver' : '· picks up here'}</span>
-              {nextOutDriver && (
-                <TeamBadge id={nextOutDriver.id} name={nextOutDriver.name} />
-              )}
-              {nextOut.note && <span className="text-zinc-400">· {nextOut.note}</span>}
-            </>
-          ) : atMatch.length > 0 ? (
-            `${atMatch.length} packed ${atMatch.length === 1 ? 'box needs' : 'boxes need'} a taker — call the list`
-          ) : atPack.length > 0 ? (
-            'Orders waiting to be packed.'
-          ) : (
-            'Pipeline is clear.'
-          )}
-        </p>
-
+        {/* Visual anchor — the Pack→Match→Handoff connector, flex-1. */}
         <div className="mt-3 min-h-28 flex-1">
           <OutboundStatusBoard
             buckets={[
-              {
-                n: atPack.length,
-                label: 'Pack',
-                sub: stageOwners(atPack) || undefined,
-                tone: 'normal',
-              },
+              { n: atPack.length, label: 'Pack', sub: stageOwners(atPack) || undefined, tone: 'normal' },
               {
                 n: atMatch.length,
                 label: 'Match',
                 sub: atMatch.length > 0 ? 'call list' : undefined,
                 tone: atMatch.length > 0 ? 'urgent' : 'normal',
               },
-              {
-                n: atHandoff.length,
-                label: 'Handoff',
-                sub: stageOwners(atHandoff) || undefined,
-                tone: 'calm',
-              },
+              { n: atHandoff.length, label: 'Handoff', sub: stageOwners(atHandoff) || undefined, tone: 'calm' },
             ]}
           />
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-2">
+        {/* Footer — full-width primary, centered secondary. */}
+        <div className="mt-4">
           <Button
-            size="sm"
+            className="w-full"
             variant={open.length > 0 ? 'primary' : 'outline'}
             onClick={() => navigate('distribution')}
           >
             <Icon name="arrow" size={14} /> Work the pipeline
           </Button>
-          <button
-            onClick={() => navigate('distribution')}
-            className="inline-flex items-center gap-1 text-xs font-medium text-zinc-500 hover:text-zinc-900"
-          >
-            View distribution <Icon name="chevron" size={12} />
-          </button>
         </div>
-
         <button
           onClick={() => openPickup()}
-          className="mt-2 text-xs font-medium text-zinc-400 hover:text-zinc-700"
+          className="mt-2 w-full text-center text-xs font-medium text-zinc-400 hover:text-zinc-700"
         >
           + Log a request
         </button>
       </Card>
     </div>
+  );
+}
+
+/** The tile's title, now the click-through to its full surface (Intake /
+ *  Distribution) — replaces the old separate "View intake/distribution" link. */
+function TileHeader({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: 'truck' | 'arrow';
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="group eyebrow -m-1 flex items-center gap-1.5 self-start rounded-md p-1 text-[11px] font-bold text-zinc-400 transition-colors hover:bg-zinc-50 hover:text-zinc-700"
+    >
+      <Icon name={icon} size={13} />
+      {label}
+      <Icon
+        name="chevron"
+        size={11}
+        className="text-zinc-300 opacity-0 transition-opacity group-hover:opacity-100"
+      />
+    </button>
   );
 }
 
@@ -276,9 +287,20 @@ function MetricTab({
           : 'opacity-50 hover:bg-zinc-50 hover:opacity-100',
       )}
     >
-      <Count n={n} size="text-2xl" />
+      <Count n={n} />
       <div className="text-xs text-zinc-500">{label}</div>
     </button>
+  );
+}
+
+/** Food Out's KPI block — same box/typography as MetricTab, but static (not a
+ *  tab) and always plain black: no urgency color on the large number. */
+function KpiBlock({ n, label }: { n: number; label: string }) {
+  return (
+    <div className="flex-1 rounded-lg px-2.5 py-1.5 text-left">
+      <Count n={n} />
+      <div className="text-xs text-zinc-500">{label}</div>
+    </div>
   );
 }
 
@@ -298,15 +320,10 @@ function CrossCheckItems({ delivery }: { delivery: Delivery }) {
   );
 }
 
-function Count({
-  n,
-  tone = 'normal',
-  size = 'text-3xl',
-}: {
-  n: number;
-  tone?: 'normal' | 'urgent';
-  size?: string;
-}) {
+/** Every KPI number: same size everywhere, always plain black. Color is
+ *  reserved for status elsewhere (tier marks, the Act-first headline) — not
+ *  for a tile's hero count. */
+function Count({ n }: { n: number }) {
   return (
     <span className="relative inline-flex h-9 min-w-[2rem] items-center justify-start">
       <AnimatePresence mode="popLayout" initial={false}>
@@ -316,11 +333,7 @@ function Count({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
           transition={SPRING.pop}
-          className={cn(
-            'nums font-bold',
-            size,
-            tone === 'urgent' && n > 0 ? 'text-red-600' : 'text-zinc-950',
-          )}
+          className="nums text-2xl font-bold text-zinc-950"
         >
           {n}
         </motion.span>
