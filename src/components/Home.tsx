@@ -1,33 +1,24 @@
-import { useStore } from '../store/useStore';
+import { useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useUI } from '../store/useUI';
-import { getLotStatus } from '../domain/status';
-import { TriageBar } from './TriageBar';
+import { TodayWorklist } from './TodayWorklist';
 import { DecayTimeline } from './DecayTimeline';
 import { MoveFirstZone } from './MoveFirstZone';
 import { LowStockZone } from './LowStockZone';
-import { Button, Card, Icon } from '../ui/primitives';
+import { Button, Icon } from '../ui/primitives';
 import { cn } from '../ui/cn';
+import { SPRING } from '../ui/motion';
 
-/** Shelf = the standing picture + entry points (the Mercury pattern). The clock
- *  lives here; Intake, Distribution, and Inventory are one tap away; mutations
- *  are sheets launched from the action row or from any lot. */
+/** Shelf = "Today": a decay-generated worklist you clear, not a dashboard you
+ *  parse. Proactive entry points sit in a slim action row; the rich status
+ *  (timeline + zones) is one tap away behind "View the full shelf". */
 export function Home() {
-  const { lots, requests, deliveries, wasteEvents, today, config } = useStore();
-  const { navigate, openIntake, openPickup, openExpect } = useUI();
-
-  const pending = requests.filter((r) => r.status === 'requested').length;
-  const incoming = deliveries.filter((d) => d.status === 'expected').length;
-  const stocked = lots.filter((l) => l.quantity > 0);
-  const expiredToPull = stocked.filter(
-    (l) => getLotStatus(l, today, config) === 'expired',
-  ).length;
-  const wastedToday = wasteEvents
-    .filter((w) => w.date === today)
-    .reduce((s, w) => s + w.quantity, 0);
+  const { openIntake, openPickup, openExpect } = useUI();
+  const [showShelf, setShowShelf] = useState(false);
 
   return (
     <div className="space-y-4">
-      {/* Action row — the two verbs. Walk-in is the exception, demoted to ghost. */}
+      {/* Proactive entry points — the two verbs; walk-in demoted to ghost. */}
       <div className="flex flex-wrap items-center gap-2">
         <Button size="lg" onClick={openExpect}>
           <Icon name="inbox" size={16} /> Expect a delivery
@@ -40,98 +31,51 @@ export function Home() {
         </Button>
       </div>
 
-      {/* Focusing layer: what do I touch first? */}
-      <TriageBar />
+      {/* The hero: the ranked list of what to do today. */}
+      <TodayWorklist />
 
-      {/* The clock, two readings: shape of the week + ordered action queue. */}
-      <DecayTimeline />
-      <div className="grid items-start gap-4 md:grid-cols-2">
-        <MoveFirstZone />
-        <LowStockZone />
-      </div>
+      {/* The full picture, on demand. */}
+      <div>
+        <button
+          onClick={() => setShowShelf((v) => !v)}
+          aria-expanded={showShelf}
+          className="flex w-full items-center justify-between rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950"
+        >
+          <span className="inline-flex items-center gap-2">
+            <Icon name="clock" size={16} className="text-zinc-400" />
+            View the full shelf
+            <span className="text-zinc-400">— timeline, what's dying, low stock</span>
+          </span>
+          <span
+            className={cn(
+              'text-zinc-400 transition-transform',
+              showShelf && 'rotate-90',
+            )}
+          >
+            <Icon name="chevron" size={16} />
+          </span>
+        </button>
 
-      {/* Jumping-off points: the two verbs + the ledger. */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <SummaryCard
-          title="Intake"
-          onClick={() => navigate('intake')}
-          stat={
-            <>
-              <b className={cn('nums text-2xl font-bold', incoming > 0 ? 'text-zinc-950' : 'text-zinc-400')}>
-                {incoming}
-              </b>{' '}
-              incoming
-            </>
-          }
-          sub="Deliveries on their way in."
-        />
-        <SummaryCard
-          title="Distribution"
-          onClick={() => navigate('distribution')}
-          stat={
-            <>
-              <b className={cn('nums text-2xl font-bold', pending > 0 ? 'text-zinc-950' : 'text-zinc-400')}>
-                {pending}
-              </b>{' '}
-              to release
-            </>
-          }
-          sub="Partner requests to fulfill."
-        />
-        <SummaryCard
-          title="Inventory"
-          onClick={() => navigate('inventory')}
-          stat={
-            <>
-              <b className="nums text-2xl font-bold text-zinc-950">
-                {stocked.length}
-              </b>{' '}
-              on hand
-            </>
-          }
-          sub={
-            expiredToPull > 0 ? (
-              <span className="font-semibold text-red-700">
-                {expiredToPull} expired to pull
-              </span>
-            ) : wastedToday > 0 ? (
-              `${wastedToday} units wasted today`
-            ) : (
-              'Every lot on the shelf.'
-            )
-          }
-        />
+        <AnimatePresence initial={false}>
+          {showShelf && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={SPRING.reflow}
+              style={{ overflow: 'hidden' }}
+            >
+              <div className="space-y-4 pt-4">
+                <DecayTimeline />
+                <div className="grid items-start gap-4 md:grid-cols-2">
+                  <MoveFirstZone />
+                  <LowStockZone />
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
-  );
-}
-
-function SummaryCard({
-  title,
-  stat,
-  sub,
-  onClick,
-}: {
-  title: string;
-  stat: React.ReactNode;
-  sub: React.ReactNode;
-  onClick: () => void;
-}) {
-  return (
-    <Card className="p-0">
-      <button
-        onClick={onClick}
-        className="flex w-full items-center gap-3 rounded-lg p-4 text-left transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 sm:p-5"
-      >
-        <div className="min-w-0 flex-1">
-          <div className="eyebrow text-xs font-bold text-zinc-950">{title}</div>
-          <div className="mt-1.5 text-sm text-zinc-600">{stat}</div>
-          <div className="mt-0.5 text-xs text-zinc-500">{sub}</div>
-        </div>
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-500">
-          <Icon name="chevron" size={16} />
-        </span>
-      </button>
-    </Card>
   );
 }

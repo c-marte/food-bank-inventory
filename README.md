@@ -101,13 +101,18 @@ match destination count). "Pickup" was **retired** — it's directionally
 ambiguous (a volunteer picks up *from* a vendor = intake; a partner picks up =
 distribution).
 
-- **Shelf** (`Home`) — status + entry points. The action row (*Expect a
-  delivery*, *Log a request*, *Walk-in*), then **Act first** (`TriageBar`): the
-  single most urgent lot as a tappable headline, plus counts with paths
-  (expired → filtered ledger, arriving → Intake, to-release → Distribution).
-  Then the clock in two readings: the **decay timeline** and **Move first**
-  (time buckets + a **time-to-zero bar** per lot), **Low stock** beside it.
-  Three summary cards jump to Intake / Distribution / Inventory.
+- **Shelf** (`Home`) = **"Today"** (`TodayWorklist`) — not a dashboard you
+  parse, but a **decay-generated worklist you clear.** The home is a ranked
+  list of what to *do* today, derived from the clock + both flows, with the
+  verb inline: 🔥 *Send N sandwiches to a meal program (dies today)*, 🚚 *Receive
+  Sal's Catering*, ❄ *Pack a family box (FEFO)*, → *Release order to Northside*,
+  🗑 *Pull 2 expired lots*. Ranked by urgency (send-today → receive → box →
+  release → pull); completed work **recedes** into "Done today"; the list is
+  live (receiving prepared food instantly spawns "send it out" tasks). A slim
+  action row keeps the proactive entry points. The rich status — the **decay
+  timeline**, **Move first**, **Low stock** — is one tap away behind **"View
+  the full shelf"** (it's reference, not the daily driver). Turns the app from
+  a *look* page into a *do* page.
 - **Intake** (`IntakePage`) — food IN: the two capture paths and the incoming
   queue (`IncomingDeliveries`).
 - **Distribution** (`PickupsQueue`) — food OUT, **decay-forward** (the outflow
