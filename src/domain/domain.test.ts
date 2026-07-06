@@ -146,7 +146,7 @@ describe('confirmRequest — rule 2: confirm decrements', () => {
     const res = confirmRequest('r1', lots, requests, partners, TODAY, CONFIG)!;
     expect(res.lots.find((l) => l.id === 'l1')!.quantity).toBe(6); // 10 - 4
     expect(res.request.status).toBe('confirmed');
-    expect(res.reminder).toBe('Reminder queued: notify Northside — pickup confirmed (1 item).');
+    expect(res.reminder).toBe('Reminder queued: notify Northside — released (1 item).');
   });
 
   it('clamps at zero and reports a shortfall in the reminder', () => {
@@ -157,7 +157,7 @@ describe('confirmRequest — rule 2: confirm decrements', () => {
     const res = confirmRequest('r1', lots, requests, partners, TODAY, CONFIG)!;
     expect(res.lots.find((l) => l.id === 'l1')!.quantity).toBe(0); // max(0, 5 - 8)
     expect(res.reminder).toBe(
-      'Reminder queued: notify Northside — pickup confirmed with shortages: Bananas (5 of 8).',
+      'Reminder queued: notify Northside — released with shortages: Bananas (5 of 8).',
     );
   });
 

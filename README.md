@@ -92,25 +92,42 @@ is deterministic and the seed is testable. The boundary assertions in
   `src/store/useUI.tsx` holds shell state: which spoke is visible, which sheet
   is open.
 
-### Hub-and-spoke IA
+### IA: the standing picture + two verbs
 
-**Home is status + entry points; work lives on pages; mutations are sheets**
-(the Mercury home pattern, scaled to three destinations — tabs, not a sidebar,
-because nav chrome should match destination count).
+Nav is **Shelf · Intake · Distribution** — the two operational verbs (food in,
+food out) plus the standing picture (the Mercury home pattern: status is the
+page, flows are the buttons; tabs, not a sidebar, because nav chrome should
+match destination count). "Pickup" was **retired** — it's directionally
+ambiguous (a volunteer picks up *from* a vendor = intake; a partner picks up =
+distribution).
 
-- **Home** — the action row (*Log donation*, *Record pickup*), then **Act
-  first** (`TriageBar`): the single most urgent lot as a tappable headline,
-  plus state-of-the-shelf counts with paths (expired → filtered ledger,
-  pickups → queue). Then the clock in two readings: the **decay timeline**
-  (lots plotted on their death day as food-emoji markers; same-day piles fan
-  out on tap) and **Move first** (time buckets + a **time-to-zero bar** per
-  lot). **Low stock** beside it, independent by design. Summary cards jump to
-  the spokes.
-- **Pickups** (`PickupsQueue`) — the outflow queue: pending requests confirm
-  here (rule 2), partial fulfillment named in the reminder.
-- **Inventory** (`LotList`) — the ledger: every lot, statuses mixed, an
-  **Expired only** filter (the triage path lands here), zero-quantity kept and
-  de-emphasized.
+- **Shelf** (`Home`) — status + entry points. The action row (*Expect a
+  delivery*, *Log a request*, *Walk-in*), then **Act first** (`TriageBar`): the
+  single most urgent lot as a tappable headline, plus counts with paths
+  (expired → filtered ledger, arriving → Intake, to-release → Distribution).
+  Then the clock in two readings: the **decay timeline** and **Move first**
+  (time buckets + a **time-to-zero bar** per lot), **Low stock** beside it.
+  Three summary cards jump to Intake / Distribution / Inventory.
+- **Intake** (`IntakePage`) — food IN: the two capture paths and the incoming
+  queue (`IncomingDeliveries`).
+- **Distribution** (`PickupsQueue`) — food OUT: partner requests; **Release**
+  decrements (rule 2), partial fulfillment named in the reminder.
+- **Inventory** (`LotList`) — the ledger (reached from a Shelf card, not the
+  top nav): every lot, statuses mixed, an **Expired only** filter, zero-quantity
+  kept and de-emphasized.
+
+### Perishability tiers — the axis the job turns on
+
+Every lot carries a **handling tier** (`PerishTier`: prepared / fresh /
+shelf_stable) distinct from its grocery `category` — a chicken tray, frozen
+chicken, and canned tuna are all "protein" but three different tiers. Tier is
+inferred at capture (`inferTier`) and verified at the dock. It drives a
+**tier-aware expiring window** (`getLotStatus`: a prepared tray is "soon" at
+1–2 days, a can only within weeks), and it's the one per-item visual asset —
+rendered as a monochrome **tier mark** (flame / snowflake / box; shape carries
+the semantic so color stays reserved for status). Section groups get one brand
+icon (a truck on Intake). No per-food emoji — assets are semantic, not
+decorative.
 
 ### The verb layer
 

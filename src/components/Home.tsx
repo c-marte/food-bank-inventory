@@ -2,22 +2,21 @@ import { useStore } from '../store/useStore';
 import { useUI } from '../store/useUI';
 import { getLotStatus } from '../domain/status';
 import { TriageBar } from './TriageBar';
-import { IncomingDeliveries } from './IncomingDeliveries';
 import { DecayTimeline } from './DecayTimeline';
 import { MoveFirstZone } from './MoveFirstZone';
 import { LowStockZone } from './LowStockZone';
 import { Button, Card, Icon } from '../ui/primitives';
 import { cn } from '../ui/cn';
 
-/** Home = status + entry points (the Mercury pattern). The clock lives here;
- *  the working pages (Pickups, Inventory) are one tap away; the mutations are
- *  sheets launched from the action row or from any lot. */
+/** Shelf = the standing picture + entry points (the Mercury pattern). The clock
+ *  lives here; Intake, Distribution, and Inventory are one tap away; mutations
+ *  are sheets launched from the action row or from any lot. */
 export function Home() {
-  const { lots, requests, wasteEvents, today, config } = useStore();
+  const { lots, requests, deliveries, wasteEvents, today, config } = useStore();
   const { navigate, openIntake, openPickup, openExpect } = useUI();
 
   const pending = requests.filter((r) => r.status === 'requested').length;
-  const confirmed = requests.filter((r) => r.status === 'confirmed').length;
+  const incoming = deliveries.filter((d) => d.status === 'expected').length;
   const stocked = lots.filter((l) => l.quantity > 0);
   const expiredToPull = stocked.filter(
     (l) => getLotStatus(l, today, config) === 'expired',
@@ -28,14 +27,13 @@ export function Home() {
 
   return (
     <div className="space-y-4">
-      {/* Action row — food in (mostly announced), food out. Walk-ins are the
-          exception, so quick-add is demoted to a ghost button. */}
+      {/* Action row — the two verbs. Walk-in is the exception, demoted to ghost. */}
       <div className="flex flex-wrap items-center gap-2">
         <Button size="lg" onClick={openExpect}>
           <Icon name="inbox" size={16} /> Expect a delivery
         </Button>
         <Button size="lg" variant="outline" onClick={() => openPickup()}>
-          <Icon name="arrow" size={16} /> Record pickup
+          <Icon name="arrow" size={16} /> Log a request
         </Button>
         <Button size="lg" variant="ghost" onClick={openIntake}>
           <Icon name="plus" size={16} /> Walk-in
@@ -45,9 +43,6 @@ export function Home() {
       {/* Focusing layer: what do I touch first? */}
       <TriageBar />
 
-      {/* Food on its way — receive it at the dock. */}
-      <IncomingDeliveries />
-
       {/* The clock, two readings: shape of the week + ordered action queue. */}
       <DecayTimeline />
       <div className="grid items-start gap-4 md:grid-cols-2">
@@ -55,24 +50,33 @@ export function Home() {
         <LowStockZone />
       </div>
 
-      {/* Jumping-off points to the working pages. */}
-      <div className="grid gap-4 sm:grid-cols-2">
+      {/* Jumping-off points: the two verbs + the ledger. */}
+      <div className="grid gap-4 sm:grid-cols-3">
         <SummaryCard
-          title="Pickups"
-          onClick={() => navigate('pickups')}
+          title="Intake"
+          onClick={() => navigate('intake')}
+          stat={
+            <>
+              <b className={cn('nums text-2xl font-bold', incoming > 0 ? 'text-zinc-950' : 'text-zinc-400')}>
+                {incoming}
+              </b>{' '}
+              incoming
+            </>
+          }
+          sub="Deliveries on their way in."
+        />
+        <SummaryCard
+          title="Distribution"
+          onClick={() => navigate('distribution')}
           stat={
             <>
               <b className={cn('nums text-2xl font-bold', pending > 0 ? 'text-zinc-950' : 'text-zinc-400')}>
                 {pending}
               </b>{' '}
-              pending
+              to release
             </>
           }
-          sub={
-            confirmed > 0
-              ? `${confirmed} confirmed today`
-              : 'Requests land here when partners call.'
-          }
+          sub="Partner requests to fulfill."
         />
         <SummaryCard
           title="Inventory"
@@ -82,7 +86,7 @@ export function Home() {
               <b className="nums text-2xl font-bold text-zinc-950">
                 {stocked.length}
               </b>{' '}
-              lots on hand
+              on hand
             </>
           }
           sub={
@@ -91,9 +95,9 @@ export function Home() {
                 {expiredToPull} expired to pull
               </span>
             ) : wastedToday > 0 ? (
-              `${wastedToday} units logged as waste today`
+              `${wastedToday} units wasted today`
             ) : (
-              'Every donation, one row per lot.'
+              'Every lot on the shelf.'
             )
           }
         />

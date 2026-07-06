@@ -115,7 +115,12 @@ export function TriageBar() {
       {/* State-of-the-shelf strip. Counts with a destination are tappable. */}
       <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-zinc-100 pt-3">
         {arrivingToday > 0 && (
-          <Stat n={arrivingToday} label="arriving today" tone="zinc" />
+          <Stat
+            n={arrivingToday}
+            label="arriving today"
+            tone="zinc"
+            onClick={() => navigate('intake')}
+          />
         )}
         <Stat n={expiring.length} label="expiring soon" tone="amber" />
         {expired.length > 0 && (
@@ -129,9 +134,9 @@ export function TriageBar() {
         <Stat n={low.length} label={low.length === 1 ? 'category low' : 'categories low'} tone="amber" />
         <Stat
           n={pending.length}
-          label={pending.length === 1 ? 'pickup waiting' : 'pickups waiting'}
+          label={pending.length === 1 ? 'to release' : 'to release'}
           tone="zinc"
-          onClick={() => navigate('pickups')}
+          onClick={() => navigate('distribution')}
         />
       </div>
     </Card>

@@ -4,6 +4,7 @@ import { StoreProvider } from './store/useStore';
 import { UIProvider, useUI } from './store/useUI';
 import { Header } from './components/Header';
 import { Home } from './components/Home';
+import { IntakePage } from './components/IntakePage';
 import { PickupsQueue } from './components/PickupsQueue';
 import { LotList } from './components/LotList';
 import { ReminderLine } from './components/ReminderLine';
@@ -33,8 +34,9 @@ function Shell() {
         {/* Global: confirms and waste logs report here on any page. */}
         <ReminderLine />
 
-        {view === 'home' && <Home />}
-        {view === 'pickups' && <PickupsQueue />}
+        {view === 'shelf' && <Home />}
+        {view === 'intake' && <IntakePage />}
+        {view === 'distribution' && <PickupsQueue />}
         {view === 'inventory' && <LotList />}
       </main>
 

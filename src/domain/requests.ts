@@ -148,12 +148,12 @@ function buildReminder(partnerName: string, fulfillments: Fulfillment[]): string
   const shortfalls = fulfillments.filter((f) => f.fulfilled < f.requested);
   if (shortfalls.length === 0) {
     const n = fulfillments.length;
-    return `Reminder queued: notify ${partnerName} — pickup confirmed (${n} ${
+    return `Reminder queued: notify ${partnerName} — released (${n} ${
       n === 1 ? 'item' : 'items'
     }).`;
   }
   const detail = shortfalls
     .map((f) => `${f.name} (${f.fulfilled} of ${f.requested})`)
     .join(', ');
-  return `Reminder queued: notify ${partnerName} — pickup confirmed with shortages: ${detail}.`;
+  return `Reminder queued: notify ${partnerName} — released with shortages: ${detail}.`;
 }

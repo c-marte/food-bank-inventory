@@ -1,12 +1,17 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
 
 // ---------------------------------------------------------------------------
-// Shell state: which spoke is visible, and which (single) sheet is open.
-// Hub-and-spoke IA — Home is status + entry points; Pickups and Inventory are
-// the working pages; mutations are sheets launched from anywhere.
+// Shell state: which view is visible, and which (single) sheet is open.
+// IA is the two operational verbs plus the standing picture:
+//   Shelf        — the decay-forward glance + jump-offs (the hero, default)
+//   Intake       — food IN: incoming deliveries, expect/walk-in
+//   Distribution — food OUT: partner requests, release
+// Inventory (the full ledger) is reached from a Shelf card, not the top nav.
+// "pickup" is retired: it was directionally ambiguous (a volunteer picks up
+// FROM a vendor = intake; a partner picks up = distribution).
 // ---------------------------------------------------------------------------
 
-export type View = 'home' | 'pickups' | 'inventory';
+export type View = 'shelf' | 'intake' | 'distribution' | 'inventory';
 
 export type SheetState =
   | null
@@ -35,7 +40,7 @@ interface UIValue {
 const UIContext = createContext<UIValue | null>(null);
 
 export function UIProvider({ children }: { children: ReactNode }) {
-  const [view, setView] = useState<View>('home');
+  const [view, setView] = useState<View>('shelf');
   const [sheet, setSheet] = useState<SheetState>(null);
   const [expiredOnly, setExpiredOnly] = useState(false);
 

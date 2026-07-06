@@ -7,8 +7,9 @@ import { Button, Card, EmptyCard, Icon, SectionHeader } from '../ui/primitives';
 import { cn } from '../ui/cn';
 import { SPRING } from '../ui/motion';
 
-/** The outflow queue. Requests arrive (seeded, or recorded by staff when a
- *  partner calls) and Confirm is the moment stock actually leaves the shelf. */
+/** Distribution — food OUT. Partner requests arrive (seeded, or logged by staff
+ *  when a partner calls); Release is the moment stock actually leaves the shelf
+ *  (rule 2: decrements). */
 export function PickupsQueue() {
   const { requests, lots, partners, today, config, confirmRequest } = useStore();
   const { openPickup } = useUI();
@@ -21,50 +22,62 @@ export function PickupsQueue() {
   const pending = requests.filter((r) => r.status === 'requested').length;
 
   return (
-    <Card className="p-4 sm:p-5">
-      <SectionHeader
-        right={
-          <div className="flex items-center gap-2">
-            {pending > 0 ? (
-              <span className="nums rounded-full bg-zinc-900 px-2 py-0.5 text-[11px] font-bold text-white">
-                {pending} pending
-              </span>
-            ) : (
-              <span className="eyebrow text-[10px] font-bold text-zinc-400">
-                all clear
-              </span>
-            )}
-            <Button size="sm" variant="outline" onClick={() => openPickup()}>
-              <Icon name="plus" size={13} /> Record pickup
-            </Button>
-          </div>
-        }
-      >
-        Pickups
-      </SectionHeader>
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-xl font-bold tracking-tight text-zinc-950">
+          Distribution
+        </h1>
+        <p className="mt-0.5 text-sm text-zinc-500">
+          Partner requests to fulfill. Releasing decrements the referenced lots —
+          the moment food leaves the shelf.
+        </p>
+      </div>
 
-      {sorted.length === 0 ? (
-        <div className="mt-3">
-          <EmptyCard>No pickup requests yet.</EmptyCard>
-        </div>
-      ) : (
-        <ul className="mt-3 space-y-2.5">
-          <AnimatePresence initial={false}>
-            {sorted.map((req) => (
-              <RequestRow
-                key={req.id}
-                req={req}
-                partnerName={partners.find((p) => p.id === req.partnerId)?.name ?? 'Partner'}
-                lots={lots}
-                today={today}
-                config={config}
-                onConfirm={() => confirmRequest(req.id)}
-              />
-            ))}
-          </AnimatePresence>
-        </ul>
-      )}
-    </Card>
+      <Card className="p-4 sm:p-5">
+        <SectionHeader
+          right={
+            <div className="flex items-center gap-2">
+              {pending > 0 ? (
+                <span className="nums rounded-full bg-zinc-900 px-2 py-0.5 text-[11px] font-bold text-white">
+                  {pending} to release
+                </span>
+              ) : (
+                <span className="eyebrow text-[10px] font-bold text-zinc-400">
+                  all clear
+                </span>
+              )}
+              <Button size="sm" variant="outline" onClick={() => openPickup()}>
+                <Icon name="plus" size={13} /> Log a request
+              </Button>
+            </div>
+          }
+        >
+          Partner requests
+        </SectionHeader>
+
+        {sorted.length === 0 ? (
+          <div className="mt-3">
+            <EmptyCard>No requests yet.</EmptyCard>
+          </div>
+        ) : (
+          <ul className="mt-3 space-y-2.5">
+            <AnimatePresence initial={false}>
+              {sorted.map((req) => (
+                <RequestRow
+                  key={req.id}
+                  req={req}
+                  partnerName={partners.find((p) => p.id === req.partnerId)?.name ?? 'Partner'}
+                  lots={lots}
+                  today={today}
+                  config={config}
+                  onConfirm={() => confirmRequest(req.id)}
+                />
+              ))}
+            </AnimatePresence>
+          </ul>
+        )}
+      </Card>
+    </div>
   );
 }
 
@@ -104,7 +117,7 @@ function RequestRow({
           </span>
           {confirmed ? (
             <span className="eyebrow inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 ring-1 ring-emerald-200">
-              <Icon name="check" size={11} /> CONFIRMED
+              <Icon name="check" size={11} /> RELEASED
             </span>
           ) : (
             <span className="eyebrow rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 ring-1 ring-amber-200">
@@ -114,7 +127,7 @@ function RequestRow({
         </div>
         {!confirmed && (
           <Button size="sm" onClick={onConfirm}>
-            <Icon name="check" size={14} /> Confirm
+            <Icon name="arrow" size={14} /> Release
           </Button>
         )}
       </div>

@@ -63,7 +63,7 @@ export function RecordPickupSheet({
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title="Record a pickup request">
+    <Sheet open={open} onClose={onClose} title="Log a partner request">
       <div className="space-y-5">
         <Field label="Partner">
           <div className="flex flex-wrap gap-2">
@@ -140,7 +140,7 @@ export function RecordPickupSheet({
 
         <div className="flex flex-wrap items-center gap-3 border-t border-zinc-100 pt-4">
           <Button size="lg" onClick={submit} disabled={items.length === 0}>
-            <Icon name="arrow" size={15} /> Add to pickups
+            <Icon name="arrow" size={15} /> Add to distribution
           </Button>
           <span className="nums text-xs text-zinc-500">
             {items.length === 0

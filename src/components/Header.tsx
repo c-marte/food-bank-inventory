@@ -5,18 +5,21 @@ import { weekdayDateLabel } from '../ui/format';
 import { cn } from '../ui/cn';
 
 const TABS: { id: View; label: string }[] = [
-  { id: 'home', label: 'Home' },
-  { id: 'pickups', label: 'Pickups' },
-  { id: 'inventory', label: 'Inventory' },
+  { id: 'shelf', label: 'Shelf' },
+  { id: 'intake', label: 'Intake' },
+  { id: 'distribution', label: 'Distribution' },
 ];
 
-/** Brand + date on the left, the three destinations in the middle, reset on
- *  the right. Hub-and-spoke with three spokes — tabs, not a sidebar; the nav
- *  chrome scales with the destination count. */
+/** Logo + date on the left, the three destinations in the middle, reset on the
+ *  right. The standing picture (Shelf) plus the two verbs (Intake / Distribution).
+ *  Tabs, not a sidebar — nav chrome scales with the destination count. */
 export function Header() {
-  const { today, reset, requests } = useStore();
+  const { today, reset, requests, deliveries } = useStore();
   const { view, navigate } = useUI();
   const pending = requests.filter((r) => r.status === 'requested').length;
+  const incoming = deliveries.filter((d) => d.status === 'expected').length;
+  const badgeFor = (id: View) =>
+    id === 'distribution' ? pending : id === 'intake' ? incoming : 0;
 
   return (
     <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/90 backdrop-blur">
@@ -25,13 +28,8 @@ export function Header() {
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-zinc-950 text-white">
             <Icon name="check" size={16} />
           </div>
-          <div className="leading-tight">
-            <div className="text-sm font-bold tracking-tight text-zinc-950">
-              Shelf
-            </div>
-            <div className="nums text-xs text-zinc-500">
-              {weekdayDateLabel(today)}
-            </div>
+          <div className="nums text-xs font-medium text-zinc-500">
+            {weekdayDateLabel(today)}
           </div>
         </div>
 
@@ -41,6 +39,7 @@ export function Header() {
         >
           {TABS.map((tab) => {
             const active = view === tab.id;
+            const badge = badgeFor(tab.id);
             return (
               <button
                 key={tab.id}
@@ -54,14 +53,14 @@ export function Header() {
                 )}
               >
                 {tab.label}
-                {tab.id === 'pickups' && pending > 0 && (
+                {badge > 0 && (
                   <span
                     className={cn(
                       'nums ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold',
                       active ? 'bg-white text-zinc-950' : 'bg-zinc-950 text-white',
                     )}
                   >
-                    {pending}
+                    {badge}
                   </span>
                 )}
               </button>
