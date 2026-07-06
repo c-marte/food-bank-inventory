@@ -4,6 +4,7 @@ import { getDyingLots } from '../domain/distribution';
 import { useStore } from '../store/useStore';
 import { useUI } from '../store/useUI';
 import { Button, Card, Icon, TierChip } from '../ui/primitives';
+import { DeliveryOriginMap, OutboundStatusBoard } from './FlowTileVisuals';
 import { cn } from '../ui/cn';
 import { SPRING } from '../ui/motion';
 
@@ -23,7 +24,7 @@ function timingLabel(daysAway: number): string {
 }
 
 export function FlowTiles() {
-  const { lots, requests, deliveries, today, config } = useStore();
+  const { lots, requests, deliveries, distributions, today, config } = useStore();
   const { navigate, openReceive, openExpect, openIntake, openPickup } = useUI();
 
   const expected = [...deliveries]
@@ -33,6 +34,7 @@ export function FlowTiles() {
 
   const dying = getDyingLots(lots, today, config);
   const pendingRequests = requests.filter((r) => r.status === 'requested');
+  const releasedToday = distributions.filter((d) => d.date === today).length;
   const outCount = dying.length + pendingRequests.length;
   const nextOut = dying[0];
 
@@ -62,6 +64,19 @@ export function FlowTiles() {
             'Nothing on its way right now.'
           )}
         </p>
+
+        <div className="mt-3">
+          {nextIn ? (
+            <DeliveryOriginMap
+              donorName={nextIn.donorName}
+              timing={nextIn.note ?? timingLabel(daysUntil(nextIn.expectedDate, today))}
+            />
+          ) : (
+            <div className="flex h-28 items-center justify-center rounded-xl border border-dashed border-zinc-300 text-xs text-zinc-400">
+              No donor en route
+            </div>
+          )}
+        </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {nextIn ? (
@@ -118,6 +133,16 @@ export function FlowTiles() {
             'Nothing urgent to send.'
           )}
         </p>
+
+        <div className="mt-3">
+          <OutboundStatusBoard
+            buckets={[
+              { n: dying.length, label: 'Dying now', tone: 'urgent' },
+              { n: pendingRequests.length, label: 'Requested', tone: 'normal' },
+              { n: releasedToday, label: 'Released today', tone: 'calm' },
+            ]}
+          />
+        </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <Button

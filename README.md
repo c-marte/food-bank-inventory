@@ -116,6 +116,23 @@ distribution).
   MyFitnessPal's hero-metric-with-flanking-numbers — on Mobbin.) The rich status
   — the **decay timeline**, **Move first**, **Low stock** — is one tap away
   behind **"View the full shelf"** (reference, not the daily driver).
+
+  Each tile carries one equal-height visual anchor (`FlowTileVisuals`), same
+  slot, under the status line and above the action row:
+  - **Food In** — a static, non-live **origin → dock map**: a pinned donor
+    name, an abstract dashed route (no fabricated street data — we don't have
+    a donor's real coordinates), and a home glyph for our dock. Modeled on
+    package-tracking UIs (Shop, Klarna), but deliberately **not** a live GPS
+    tracker — we have no real-time position to show, so a moving dot would be
+    a lie the interface tells.
+  - **Food Out** — an **honest aggregate status board**, not a fabricated
+    per-item journey: *Dying now* / *Requested* / *Released today*, three
+    independent, always-true counts in a dot-and-line stepper. A literal
+    multi-stage tracker (Selected → Packed → Ready → Released) was considered
+    and rejected — our domain only has two real states per record (pending,
+    released), so a 4-stage per-item stepper would invent progress that
+    doesn't exist. The aggregate framing (closer to Jira's status tiles) says
+    only what's true.
 - **Intake** (`IntakePage`) — food IN: the two capture paths and the incoming
   queue (`IncomingDeliveries`).
 - **Distribution** (`PickupsQueue`) — food OUT, **decay-forward** (the outflow
