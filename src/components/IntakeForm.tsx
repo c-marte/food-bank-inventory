@@ -3,6 +3,7 @@ import type { Category, LotStatus } from '../domain/types';
 import { CATEGORIES, CATEGORY_LABELS } from '../domain/types';
 import { addDays, daysUntil } from '../domain/dates';
 import { getLotStatus } from '../domain/status';
+import { inferTier } from '../domain/tier';
 import { useStore } from '../store/useStore';
 import {
   Button,
@@ -53,8 +54,9 @@ export function IntakeForm({ onDone }: { onDone?: () => void }) {
   const pastExpiry = expiryDays !== null && expiryDays < 0;
   const previewStatus = useMemo(() => {
     if (!expiry) return null;
+    const cat = category ?? 'other';
     return getLotStatus(
-      { id: '', name, category: category ?? 'other', quantity, unit, receivedDate: received, expiryDate: expiry },
+      { id: '', name, category: cat, tier: inferTier(name, cat), quantity, unit, receivedDate: received, expiryDate: expiry },
       today,
       config,
     );
@@ -67,9 +69,11 @@ export function IntakeForm({ onDone }: { onDone?: () => void }) {
     if (!canSubmit || !category) return;
 
     const cleanUnit = unit.trim() || 'units';
+    const tier = inferTier(name, category);
     addDonation({
       name: name.trim(),
       category,
+      tier,
       quantity,
       unit: cleanUnit,
       receivedDate: received,
@@ -82,7 +86,7 @@ export function IntakeForm({ onDone }: { onDone?: () => void }) {
       unit: cleanUnit,
       expiryDate: expiry,
       status: getLotStatus(
-        { id: '', name, category, quantity, unit: cleanUnit, receivedDate: received, expiryDate: expiry },
+        { id: '', name, category, tier, quantity, unit: cleanUnit, receivedDate: received, expiryDate: expiry },
         today,
         config,
       ),

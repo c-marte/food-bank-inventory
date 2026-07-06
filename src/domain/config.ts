@@ -1,9 +1,14 @@
 import type { Config } from './types';
 
 /** Default configuration. Thresholds are per-category (staples carry higher
- *  floors); the expiring-soon window is 7 days, inclusive at both ends. */
+ *  floors); the expiring-soon window is tier-aware — a prepared tray is "soon"
+ *  within 2 days, fresh groceries within a week, shelf-stable within 3 weeks. */
 export const DEFAULT_CONFIG: Config = {
-  expiringSoonWindowDays: 7,
+  expiringSoonWindowByTier: {
+    prepared: 2,
+    fresh: 7,
+    shelf_stable: 21,
+  },
   lowStockThresholdByCategory: {
     canned: 24,
     produce: 20,

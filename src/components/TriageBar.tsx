@@ -71,8 +71,7 @@ export function TriageBar() {
     signature = 'all-clear';
     headline = (
       <span className="font-semibold text-emerald-700">
-        Shelves are healthy — nothing expires within the next{' '}
-        {config.expiringSoonWindowDays} days.
+        Shelves are healthy — nothing expiring soon.
       </span>
     );
   }

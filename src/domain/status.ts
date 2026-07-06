@@ -7,11 +7,12 @@ import { daysUntil } from './dates';
 // ---------------------------------------------------------------------------
 
 /**
- * Per-lot status: a pure function of expiryDate vs. today.
+ * Per-lot status: a pure function of expiryDate vs. today, with a TIER-AWARE
+ * window (a prepared tray is "soon" at 1-2 days; a can only within weeks).
  *
- *   daysUntil < 0            -> 'expired'        (expiry has passed)
- *   daysUntil in [0, window] -> 'expiring_soon'  (inclusive at both ends)
- *   daysUntil > window       -> 'ok'
+ *   daysUntil < 0             -> 'expired'        (expiry has passed)
+ *   daysUntil in [0, window]  -> 'expiring_soon'  (inclusive; window per tier)
+ *   daysUntil > window        -> 'ok'
  *
  * A zero-quantity lot still has a status — quantity is irrelevant here.
  */
@@ -22,7 +23,7 @@ export function getLotStatus(
 ): LotStatus {
   const d = daysUntil(lot.expiryDate, today);
   if (d < 0) return 'expired';
-  if (d <= config.expiringSoonWindowDays) return 'expiring_soon';
+  if (d <= config.expiringSoonWindowByTier[lot.tier]) return 'expiring_soon';
   return 'ok';
 }
 

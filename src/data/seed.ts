@@ -6,9 +6,11 @@ import type {
   InventoryLot,
   ISODate,
   Partner,
+  PerishTier,
   PickupRequest,
 } from '../domain/types';
 import { DEFAULT_CONFIG } from '../domain/config';
+import { inferTier } from '../domain/tier';
 
 // ---------------------------------------------------------------------------
 // Seed data. Every expiry date is authored RELATIVE to `today` (today+3,
@@ -30,6 +32,7 @@ interface SeedLot {
   unit: string;
   received: number; // offset in days from today (negative = past)
   expiry: number; // offset in days from today
+  tier?: PerishTier; // override where inference would be wrong
 }
 
 // prettier-ignore
@@ -56,13 +59,17 @@ const SEED_LOTS: SeedLot[] = [
   { name: 'Spaghetti',        category: 'grains',  quantity: 15, unit: 'boxes',      received: -15, expiry: 400 }, // ok
   { name: 'Rolled Oats',      category: 'grains',  quantity: 4,  unit: 'canisters',  received: -60, expiry: -3  }, // expired
 
-  // protein — LOW (5+3 = 8 < 15)
-  { name: 'Peanut Butter',    category: 'protein', quantity: 5,  unit: 'jars',       received: -25, expiry: 250 }, // ok
-  { name: 'Chicken Thighs',   category: 'protein', quantity: 3,  unit: 'lbs',        received: -5,  expiry: 4   }, // expiring_soon (frozen)
+  // protein — LOW (5+3+6 = 14 < 15; prepared sandwiches included, non-expired)
+  { name: 'Peanut Butter',    category: 'protein', quantity: 5,  unit: 'jars',       received: -25, expiry: 250, tier: 'shelf_stable' }, // ok (pantry staple, not fresh)
+  { name: 'Chicken Thighs',   category: 'protein', quantity: 3,  unit: 'lbs',        received: -5,  expiry: 4   }, // fresh/frozen, expiring_soon
 
   // other — LOW (2+3 = 5 < 10)
-  { name: 'Infant Formula',   category: 'other',   quantity: 2,  unit: 'containers', received: -6,  expiry: 9   }, // ok (just past the 7-day window)
+  { name: 'Infant Formula',   category: 'other',   quantity: 2,  unit: 'containers', received: -6,  expiry: 9   }, // shelf_stable, within 21d window
   { name: 'Cooking Oil',      category: 'other',   quantity: 3,  unit: 'bottles',    received: -3,  expiry: 2   }, // expiring_soon
+
+  // prepared — leftover catering already on the shelf (EAT NOW tier, 2-day window)
+  { name: 'Deli Sandwiches',  category: 'protein', quantity: 6,  unit: 'sandwiches', received: -1,  expiry: 0   }, // prepared, expiring TODAY
+  { name: 'Pasta Salad',      category: 'produce', quantity: 4,  unit: 'bowls',      received: 0,   expiry: 1   }, // prepared, expiring tomorrow
 ];
 
 export const SEED_PARTNERS: Partner[] = [
@@ -85,6 +92,7 @@ interface SeedDeliveryItem {
   quantity: number;
   unit: string;
   expiry: number; // offset in days from today (the promise-time guess)
+  tier?: PerishTier;
 }
 interface SeedDelivery {
   id: string;
@@ -108,7 +116,7 @@ const SEED_DELIVERIES: SeedDelivery[] = [
   {
     id: 'del-2', donorName: 'Stop & Shop', kind: 'recurring', when: 0, note: 'usual morning drop',
     items: [
-      { name: 'Wheat Bread',      category: 'grains',  quantity: 12, unit: 'loaves',  expiry: 3 },
+      { name: 'Wheat Bread',      category: 'grains',  quantity: 12, unit: 'loaves',  expiry: 3, tier: 'fresh' },
       { name: 'Bananas',          category: 'produce', quantity: 15, unit: 'bunches', expiry: 4 },
       { name: 'Whole Milk',       category: 'dairy',   quantity: 6,  unit: 'gallons', expiry: 5 },
     ],
@@ -129,6 +137,7 @@ export function buildSeed(today: ISODate): SeedData {
     id: `lot-${i + 1}`,
     name: s.name,
     category: s.category,
+    tier: s.tier ?? inferTier(s.name, s.category),
     quantity: s.quantity,
     unit: s.unit,
     receivedDate: addDays(today, s.received),
@@ -172,6 +181,7 @@ export function buildSeed(today: ISODate): SeedData {
       id: `${d.id}-item-${j + 1}`,
       name: it.name,
       category: it.category,
+      tier: it.tier ?? inferTier(it.name, it.category),
       quantity: it.quantity,
       unit: it.unit,
       expiryDate: addDays(today, it.expiry),

@@ -7,11 +7,13 @@ import type { InventoryLot } from './types';
 const TODAY = '2026-07-04';
 
 // A lot expiring `offset` days from TODAY, used to check the status mapping.
-function lotExpiringIn(offset: number): InventoryLot {
+// tier 'fresh' -> a 7-day window, so the original boundary assertions hold.
+function lotExpiringIn(offset: number, tier: InventoryLot['tier'] = 'fresh'): InventoryLot {
   return {
     id: 'x',
     name: 'Test',
-    category: 'canned',
+    category: 'produce',
+    tier,
     quantity: 1,
     unit: 'cans',
     receivedDate: TODAY,
@@ -56,6 +58,21 @@ describe('getLotStatus — boundary assertions', () => {
   });
   it('expires today + 8 -> ok', () => {
     expect(getLotStatus(lotExpiringIn(8), TODAY, DEFAULT_CONFIG)).toBe('ok');
+  });
+});
+
+describe('getLotStatus — tier-aware window', () => {
+  it('prepared: +2 is expiring_soon, +3 is ok (2-day window)', () => {
+    expect(getLotStatus(lotExpiringIn(2, 'prepared'), TODAY, DEFAULT_CONFIG)).toBe('expiring_soon');
+    expect(getLotStatus(lotExpiringIn(3, 'prepared'), TODAY, DEFAULT_CONFIG)).toBe('ok');
+  });
+  it('shelf_stable: +21 is expiring_soon, +22 is ok (21-day window)', () => {
+    expect(getLotStatus(lotExpiringIn(21, 'shelf_stable'), TODAY, DEFAULT_CONFIG)).toBe('expiring_soon');
+    expect(getLotStatus(lotExpiringIn(22, 'shelf_stable'), TODAY, DEFAULT_CONFIG)).toBe('ok');
+  });
+  it('same date, different tier, different status: +10 is ok for fresh, soon for shelf_stable', () => {
+    expect(getLotStatus(lotExpiringIn(10, 'fresh'), TODAY, DEFAULT_CONFIG)).toBe('ok');
+    expect(getLotStatus(lotExpiringIn(10, 'shelf_stable'), TODAY, DEFAULT_CONFIG)).toBe('expiring_soon');
   });
 });
 

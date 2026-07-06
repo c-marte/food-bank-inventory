@@ -105,7 +105,7 @@ export function RecordPickupSheet({
                       <span
                         className={cn(
                           'ml-1.5 font-semibold',
-                          d <= 1 ? 'text-red-700' : d <= config.expiringSoonWindowDays ? 'text-amber-700' : 'text-zinc-400',
+                          d <= 1 ? 'text-red-700' : d <= config.expiringSoonWindowByTier[lot.tier] ? 'text-amber-700' : 'text-zinc-400',
                         )}
                       >
                         {d}d

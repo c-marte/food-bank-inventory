@@ -28,10 +28,22 @@ export type Category =
  *  Computed at render, never stored. */
 export type LotStatus = 'ok' | 'expiring_soon' | 'expired';
 
+/**
+ * Handling class — the axis the shelf-keeper's job actually turns on: how fast
+ * must this move, and how is it stored. Distinct from `category` (a grocery-aisle
+ * taxonomy): a chicken tray, frozen chicken, and canned tuna are all "protein"
+ * but three different tiers. Drives the tier-aware expiring window.
+ *   prepared     — cooked/catered; hours-to-a-day; move today (EAT NOW)
+ *   fresh        — perishable groceries; days (KEEP COLD)
+ *   shelf_stable — canned/dry; weeks-to-years (SHELF)
+ */
+export type PerishTier = 'prepared' | 'fresh' | 'shelf_stable';
+
 export interface InventoryLot {
   id: string;
   name: string;
   category: Category;
+  tier: PerishTier;
   quantity: number;
   unit: string;
   receivedDate: ISODate;
@@ -65,6 +77,7 @@ export interface DeliveryItem {
   id: string;
   name: string;
   category: Category;
+  tier: PerishTier;
   quantity: number;
   unit: string;
   /** Best-guess at promise time (category default); VERIFIED at the dock
@@ -99,8 +112,9 @@ export interface Config {
   /** Per-category low-stock threshold. Sum of non-expired quantity strictly
    *  below this flags the category as low. */
   lowStockThresholdByCategory: Record<Category, number>;
-  /** Inclusive endpoint. daysUntil in [0, window] is expiring_soon. */
-  expiringSoonWindowDays: number;
+  /** Tier-aware inclusive endpoint: daysUntil in [0, window] is expiring_soon.
+   *  A prepared tray is "soon" at 1-2 days; a can only within a few weeks. */
+  expiringSoonWindowByTier: Record<PerishTier, number>;
 }
 
 export const CATEGORIES: Category[] = [
@@ -119,4 +133,12 @@ export const CATEGORY_LABELS: Record<Category, string> = {
   grains: 'Grains',
   protein: 'Protein',
   other: 'Other',
+};
+
+export const TIERS: PerishTier[] = ['prepared', 'fresh', 'shelf_stable'];
+
+export const TIER_LABELS: Record<PerishTier, string> = {
+  prepared: 'Eat now',
+  fresh: 'Keep cold',
+  shelf_stable: 'Shelf-stable',
 };

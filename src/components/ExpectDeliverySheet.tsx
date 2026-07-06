@@ -3,6 +3,7 @@ import type { DeliveryItem, DeliveryKind, ISODate } from '../domain/types';
 import { addDays } from '../domain/dates';
 import { categoryDefaultExpiry } from '../domain/deliveries';
 import { guessCategory, type ParsedItem } from '../domain/parseDonation';
+import { inferTier } from '../domain/tier';
 import { KNOWN_DONORS } from '../data/seed';
 import { useStore } from '../store/useStore';
 import { Sheet } from '../ui/Sheet';
@@ -90,6 +91,7 @@ export function ExpectDeliverySheet({
         id: crypto.randomUUID(),
         name: r.name.trim(),
         category,
+        tier: inferTier(r.name, category),
         quantity: r.quantity,
         unit: r.unit.trim() || 'units',
         expiryDate: r.expiryDate ?? categoryDefaultExpiry(category, today),

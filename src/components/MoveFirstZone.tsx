@@ -68,7 +68,7 @@ export function MoveFirstZone() {
       {zone.length === 0 ? (
         <div className="mt-3">
           <EmptyCard icon={<Icon name="check" size={16} className="text-emerald-600" />}>
-            Nothing expiring in the next {config.expiringSoonWindowDays} days.
+            Nothing expiring soon.
           </EmptyCard>
         </div>
       ) : (
@@ -99,7 +99,7 @@ export function MoveFirstZone() {
                       <ZoneRow
                         lot={lot}
                         days={d(lot)}
-                        window={config.expiringSoonWindowDays}
+                        window={config.expiringSoonWindowByTier[lot.tier]}
                         onOpen={() => openLot(lot.id)}
                       />
                     </motion.li>

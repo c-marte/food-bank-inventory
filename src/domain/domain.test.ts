@@ -18,12 +18,27 @@ import {
 import { markWaste } from './waste';
 import { categoryDefaultExpiry, receiveDelivery } from './deliveries';
 import { parseDonation } from './parseDonation';
+import { inferTier } from './tier';
 import { buildSeed } from '../data/seed';
+
+describe('inferTier', () => {
+  it('detects prepared food by name keyword, regardless of category', () => {
+    expect(inferTier('Turkey Sandwiches', 'protein')).toBe('prepared');
+    expect(inferTier('Baked Ziti', 'grains')).toBe('prepared');
+    expect(inferTier('Garden Salad', 'produce')).toBe('prepared');
+  });
+  it('falls back to category tier for groceries', () => {
+    expect(inferTier('Bananas', 'produce')).toBe('fresh');
+    expect(inferTier('Whole Milk', 'dairy')).toBe('fresh');
+    expect(inferTier('Black Beans', 'canned')).toBe('shelf_stable');
+    expect(inferTier('White Rice', 'grains')).toBe('shelf_stable');
+  });
+});
 
 const TODAY = '2026-07-04';
 
 const CONFIG: Config = {
-  expiringSoonWindowDays: 7,
+  expiringSoonWindowByTier: { prepared: 2, fresh: 7, shelf_stable: 21 },
   lowStockThresholdByCategory: {
     canned: 10,
     produce: 20,
@@ -34,10 +49,12 @@ const CONFIG: Config = {
   },
 };
 
+// Default tier 'fresh' (7-day window) so existing status expectations hold.
 function lot(partial: Partial<InventoryLot> & { id: string }): InventoryLot {
   return {
     name: 'Item',
     category: 'canned',
+    tier: 'fresh',
     quantity: 5,
     unit: 'cans',
     receivedDate: TODAY,
@@ -261,7 +278,7 @@ describe('receiveDelivery', () => {
     status: 'expected', expectedDate: TODAY, items,
   });
   const item = (p: Partial<DeliveryItem> & { id: string }): DeliveryItem => ({
-    name: 'Baked Ziti', category: 'grains', quantity: 6, unit: 'trays',
+    name: 'Baked Ziti', category: 'grains', tier: 'prepared', quantity: 6, unit: 'trays',
     expiryDate: addDays(TODAY, 2), ...p,
   });
   let n = 0;

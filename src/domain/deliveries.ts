@@ -6,6 +6,7 @@ import type {
   ISODate,
 } from './types';
 import { addDays } from './dates';
+import { inferTier } from './tier';
 
 // ---------------------------------------------------------------------------
 // Deliveries — food IN, the symmetric mirror of pickups (food OUT).
@@ -45,10 +46,12 @@ export function makeDeliveryItem(
   partial: Partial<DeliveryItem> = {},
 ): DeliveryItem {
   const category = partial.category ?? 'other';
+  const name = partial.name ?? '';
   return {
     id: makeId(),
-    name: partial.name ?? '',
+    name,
     category,
+    tier: partial.tier ?? inferTier(name, category),
     quantity: partial.quantity ?? 1,
     unit: partial.unit ?? 'units',
     expiryDate: partial.expiryDate ?? categoryDefaultExpiry(category, today),
@@ -90,6 +93,7 @@ export function receiveDelivery(
     id: makeId(),
     name: it.name.trim(),
     category: it.category,
+    tier: it.tier,
     quantity: it.quantity,
     unit: it.unit.trim() || 'units',
     receivedDate: today,
