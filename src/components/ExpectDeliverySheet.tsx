@@ -57,6 +57,8 @@ export function ExpectDeliverySheet({
   const [mode, setMode] = useState<TransportMode>('they_come');
   const [assigneeId, setAssigneeId] = useState<string | undefined>();
   const [note, setNote] = useState('');
+  const [estimatedWindow, setEstimatedWindow] = useState('');
+  const [latestWindow, setLatestWindow] = useState('');
   const [rows, setRows] = useState<Row[]>([blankRow()]);
 
   useEffect(() => {
@@ -67,6 +69,8 @@ export function ExpectDeliverySheet({
       setMode('they_come');
       setAssigneeId(undefined);
       setNote('');
+      setEstimatedWindow('');
+      setLatestWindow('');
       setRows([blankRow()]);
     }
   }, [open, today]);
@@ -113,6 +117,8 @@ export function ExpectDeliverySheet({
       mode,
       assigneeId,
       note: note.trim() || undefined,
+      estimatedWindow: mode === 'they_come' ? estimatedWindow.trim() || undefined : undefined,
+      latestWindow: mode === 'they_come' ? latestWindow.trim() || undefined : undefined,
       items,
     });
     onClose();
@@ -226,6 +232,33 @@ export function ExpectDeliverySheet({
             </span>
           </div>
         </Field>
+
+        {mode === 'they_come' && (
+          <Field
+            label="Arrival window (optional)"
+            hint={
+              <p className="mt-1 text-xs text-zinc-400">
+                Only if the donor gave you one, in their own words — we don't
+                track or compute this.
+              </p>
+            }
+          >
+            <div className="flex flex-wrap gap-2">
+              <input
+                value={estimatedWindow}
+                onChange={(e) => setEstimatedWindow(e.target.value)}
+                placeholder="Estimated, e.g. 7:45 PM"
+                className={cn(inputClass, 'h-11 flex-1 min-w-[9rem]')}
+              />
+              <input
+                value={latestWindow}
+                onChange={(e) => setLatestWindow(e.target.value)}
+                placeholder="Latest, e.g. 8:15 PM"
+                className={cn(inputClass, 'h-11 flex-1 min-w-[9rem]')}
+              />
+            </div>
+          </Field>
+        )}
 
         <Field label="What's coming (rough is fine)">
           <p className="mb-2 text-xs text-zinc-500">

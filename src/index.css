@@ -1,12 +1,57 @@
 @import 'tailwindcss';
 
+/* Self-hosted, not relying on the fonts being installed locally — this is a
+   deployable app (see README: "Vercel-ready"), so anyone opening it needs
+   these to render the same way, not just this machine's Font Book. Only
+   the weights actually used in the codebase (400/500/600/700 — checked via
+   grep for font-medium/font-semibold/font-bold) are bundled, so every
+   font-weight class still resolves to a real weight, never a faked one. */
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/Geist-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/Geist-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/Geist-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/Geist-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geist Pixel';
+  src: url('/fonts/GeistPixel-Regular.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
 @theme {
   --font-sans:
-    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica,
-    Arial, sans-serif;
+    'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    Helvetica, Arial, sans-serif;
+  --font-pixel: 'Geist Pixel', ui-sans-serif, system-ui, sans-serif;
   --font-mono:
     ui-monospace, 'SF Mono', 'Cascadia Mono', 'Roboto Mono', Menlo, Consolas,
     monospace;
+
+  /* The one accent color in the app — deliberately not part of the zinc
+     neutral system or the reserved status palette (red/amber/emerald/sky).
+     Used sparingly: primary CTAs only, never for selection state, badges,
+     or anything that would compete with the status system. */
+  --color-accent: #c84824;
+  --color-accent-hover: #a83c1e;
 }
 
 html {
@@ -23,6 +68,18 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* Headings only — font-family swap, nothing else. Every h1-h6 already sets
+   its own weight/size/color via Tailwind classes in place; this rule never
+   touches those. */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-pixel);
+}
+
 /* Uppercase, letter-spaced micro-labels used for section headers and columns. */
 .eyebrow {
   text-transform: uppercase;
@@ -34,6 +91,14 @@ body {
 .nums {
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum';
+}
+
+/* Warms CARTO Positron's native cool blue-white toward a stone-gray tone
+   (closer to the reference's #f5f5f4 basemap) — targets only the tile <img>
+   elements Leaflet renders, never the accent-colored route/dots layered on
+   top in a separate pane. No Mapbox token needed for this look. */
+.map-tiles-warm {
+  filter: sepia(0.22) saturate(0.55) brightness(1.04) hue-rotate(-6deg);
 }
 
 /* Respect reduced-motion for the few transitions we use. */

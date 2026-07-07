@@ -3,71 +3,54 @@ import { useUI, type View } from '../store/useUI';
 import { Button, Icon } from '../ui/primitives';
 import { weekdayDateLabel } from '../ui/format';
 import { cn } from '../ui/cn';
-
-const TABS: { id: View; label: string }[] = [
-  { id: 'shelf', label: 'Shelf' },
-  { id: 'intake', label: 'Intake' },
-  { id: 'distribution', label: 'Distribution' },
+// Labels only — "Inbound"/"Outbound" mirror each other on purpose (food in,
+// food out). The underlying view ids ('intake'/'distribution') stay as-is;
+// this is a copy change, not a routing change.
+const MENU: { id: View; label: string; icon: 'inbox' | 'box' | 'arrow' }[] = [
+  { id: 'intake', label: 'Inbound', icon: 'inbox' },
+  { id: 'inventory', label: 'Inventory', icon: 'box' },
+  { id: 'distribution', label: 'Outbound', icon: 'arrow' },
 ];
 
-/** Logo + date on the left, the three destinations in the middle, reset on the
- *  right. The standing picture (Shelf) plus the two verbs (Intake / Distribution).
- *  Tabs, not a sidebar — nav chrome scales with the destination count. */
 export function Header() {
-  const { today, reset, movements, deliveries } = useStore();
+  const { today, reset } = useStore();
   const { view, navigate } = useUI();
-  const pending = movements.filter((m) => m.status === 'open').length;
-  const incoming = deliveries.filter((d) => d.status === 'expected').length;
-  const badgeFor = (id: View) =>
-    id === 'distribution' ? pending : id === 'intake' ? incoming : 0;
 
   return (
-    <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/90 backdrop-blur">
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-2.5 sm:px-6">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-zinc-950 text-white">
-            <Icon name="check" size={16} />
-          </div>
-          <div className="nums text-xs font-medium text-zinc-500">
-            {weekdayDateLabel(today)}
-          </div>
-        </div>
-
-        <nav
-          aria-label="Sections"
-          className="order-3 -mx-1 flex w-full gap-1 sm:order-none sm:mx-0 sm:w-auto"
-        >
-          {TABS.map((tab) => {
-            const active = view === tab.id;
-            const badge = badgeFor(tab.id);
+    <header>
+      <nav
+        aria-label="Sections"
+        className="fixed left-4 top-1/2 z-30 -translate-y-1/2 rounded-3xl border border-zinc-200 bg-white p-2 shadow-lg shadow-zinc-900/10"
+      >
+        <div className="flex flex-col gap-1">
+          {MENU.map((item) => {
+            const active = view === item.id;
             return (
               <button
-                key={tab.id}
-                onClick={() => navigate(tab.id)}
+                key={item.id}
+                onClick={() => navigate(item.id)}
                 aria-current={active ? 'page' : undefined}
+                aria-label={item.label}
                 className={cn(
-                  'relative h-9 rounded-md px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950',
-                  active
-                    ? 'bg-zinc-950 text-white'
-                    : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900',
+                  'group relative flex h-10 w-10 items-center justify-center rounded-xl text-zinc-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950',
+                  active ? 'bg-zinc-100 text-zinc-950' : 'hover:bg-zinc-50',
                 )}
               >
-                {tab.label}
-                {badge > 0 && (
-                  <span
-                    className={cn(
-                      'nums ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold',
-                      active ? 'bg-white text-zinc-950' : 'bg-zinc-950 text-white',
-                    )}
-                  >
-                    {badge}
-                  </span>
-                )}
+                <Icon name={item.icon} size={18} />
+                <span className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 -translate-y-1/2 rounded-xl bg-zinc-800 px-3 py-1.5 text-sm font-medium text-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                  {item.label}
+                </span>
               </button>
             );
           })}
-        </nav>
+        </div>
+      </nav>
 
+      <div className="fixed right-4 top-4 z-30 flex items-center gap-2 rounded-full border border-zinc-200 bg-white/90 px-3 py-1.5 backdrop-blur"
+      >
+        <div className="nums text-xs font-medium text-zinc-500">
+          {weekdayDateLabel(today)}
+        </div>
         <Button
           variant="ghost"
           size="sm"
@@ -75,7 +58,7 @@ export function Header() {
           title="Reset all data to the seeded demo state"
         >
           <Icon name="reset" size={14} />
-          <span className="hidden sm:inline">Reset</span>
+          <span>Reset</span>
         </Button>
       </div>
     </header>

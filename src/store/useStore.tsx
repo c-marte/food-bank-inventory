@@ -184,7 +184,10 @@ function reducer(state: StoreState, action: Action): StoreState {
   }
 }
 
-const STORAGE_KEY = 'food-bank-inventory:v6';
+// Bump this suffix whenever a seeded shape changes (a new field on Delivery,
+// Lot, etc.) — same-day persistence otherwise serves a stale cache that
+// predates the field, and the new data silently never renders.
+const STORAGE_KEY = 'food-bank-inventory:v9';
 
 interface PersistShape {
   today: ISODate;

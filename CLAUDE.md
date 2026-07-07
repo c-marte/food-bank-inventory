@@ -23,20 +23,23 @@ These were each earned by rejecting a more obvious, dishonest alternative. Do no
 
 ## Key files (Food In)
 
-- `src/components/FoodInPanel.tsx` — the main surface. Full-width, left column = pickup/delivery toggle + donor list, right column = map + detail.
-- `src/components/DeliveryTrackerMap.tsx` — the real Leaflet map + the derived arrival stepper.
+- `src/components/FoodInPanel.tsx` — the main surface. Full-width, left column = pickup/delivery toggle + donor list, right column = bespoke detail.
+- `src/components/PickupDetail.tsx` / `DeliveryDetail.tsx` — the two bespoke right-column templates (no shared template by design).
+- `src/components/TrackerMapCanvas.tsx` — the real Leaflet map, shared by both details.
 - `src/domain/deliveries.ts` — `getDeliveryStage`, receive logic.
 - `src/data/geo.ts` — donor/dock coordinates (seed-only, fictional but real-feeling lat/lngs).
 - `src/data/seed.ts` — all seed data, authored relative to `today` (never hardcoded absolute dates).
 - `src/domain/types.ts` — `Delivery`, `DeliveryItem`, `TransportMode` (`they_come` / `we_go`).
 
-## Pending task (not yet built)
+## Pending task
 
-Rework `FoodInPanel`'s right-hand detail panel so pickup and delivery are **bespoke, not sharing one template**:
-- **Pickup:** no stepper (it's awaiting *our* initiative, not tracking an inbound journey). Show "Ready for pickup" + map + **"Get directions"** (Maps deep-link) + a **QR code** encoding that link ("scan to open on your phone").
-- **Delivery:** keep the stepper. Add an **expected window** (human string, not a computed ETA), a **summarized manifest** that expands to full detail, and a **courier block** (neutral avatar + name + "courier" label + `tel:` phone link — NOT `TeamAvatar`). Keep the **Receive** CTA (pickup does not get this CTA — its job is "go get it," not "receive at the dock").
-- New dep needed: `qrcode` (renders locally, no network call).
-- Left column: replace the big hero-count KPIs with a simple `[Pickups · n] [Deliveries · n]` toggle → always-visible donor list for the active type → **"View all in Intake →"** tertiary link.
+None right now. The Food In bespoke-detail rework (pickup vs. delivery, separate templates) is done:
+- `FoodInPanel`'s left column is a nav rail — `[Pickups · n] [Deliveries · n]` toggle, always-visible donor list, "View all in Intake →" link.
+- `PickupDetail.tsx` — "Ready for pickup" + map + real "Get directions" deep-link + a locally-rendered QR code (`qrcode` dep, `ui/QRCode.tsx`). No stepper, no Receive CTA.
+- `DeliveryDetail.tsx` — stepper + map + expected window + expandable manifest (`ManifestDisclosure`) + courier block (`CourierBadge` in `ui/primitives.tsx` — neutral avatar, `tel:` link, deliberately not `TeamAvatar`) + Receive CTA.
+- Shared map extracted to `TrackerMapCanvas.tsx` (used by both details, since the map itself doesn't differ — only the chrome around it does).
+
+Still scope-locked to Food In (see above) — Inventory management and Food Out remain feature-frozen. Next work should be scoped explicitly before starting; don't assume there's a queued task.
 
 ## Where the full history lives
 

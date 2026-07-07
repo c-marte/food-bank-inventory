@@ -1,0 +1,133 @@
+import { motion } from 'motion/react';
+import type { Delivery } from '../domain/types';
+import { getDeliveryStage, getDeliveryProgress } from '../domain/deliveries';
+import { daysUntil, parseLocalDate } from '../domain/dates';
+import { Button, CourierBadge, Icon } from '../ui/primitives';
+import { ManifestDisclosure } from './FlowTileVisuals';
+import { cn } from '../ui/cn';
+import { SPRING } from '../ui/motion';
+
+/* ─────────────────────────────────────────────────────────
+ * DELIVERY's bespoke content for the floating detail panel: an Uber-Eats-
+ * style status header (a headline naming the real stage, an arrival window
+ * under it, a 5-segment progress bar, then a second window line below the
+ * bar), a manifest you can expand for a cross-check, the donor's courier (if
+ * named — neutral avatar, never TeamAvatar), and the Receive CTA. Pickup
+ * gets none of this — see PickupDetail.tsx. The map itself lives one level
+ * up (FoodInPanel/DonorDetailModal), as the backdrop this content sits under.
+ *
+ * The "Estimated arrival" / "Latest arrival" lines are NOT computed ETAs —
+ * this app has no GPS, so it can't track a real one. They render
+ * `estimatedWindow` / `latestWindow`, two fields the donor states verbatim
+ * on the phone call (see ExpectDeliverySheet). When a delivery doesn't have
+ * them, this falls back to the calendar-date + free-text `note` it always
+ * had — never a fabricated clock time.
+ * ───────────────────────────────────────────────────────── */
+
+const SEGMENTS = 5;
+
+function fullDate(iso: string): string {
+  return parseLocalDate(iso).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function SegmentedBar({ progress, tone }: { progress: number; tone: string }) {
+  return (
+    <div className="mt-3 flex gap-1">
+      {Array.from({ length: SEGMENTS }).map((_, i) => {
+        const segStart = i / SEGMENTS;
+        const segEnd = (i + 1) / SEGMENTS;
+        const fillPct =
+          Math.max(0, Math.min(1, (progress - segStart) / (segEnd - segStart))) * 100;
+        return (
+          <div key={i} className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-200">
+            <motion.div
+              className={cn('h-full rounded-full', tone)}
+              initial={false}
+              animate={{ width: `${fillPct}%` }}
+              transition={SPRING.reflow}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function StatusHeader({ delivery, today }: { delivery: Delivery; today: string }) {
+  const stage = getDeliveryStage(delivery, today);
+  const progress = getDeliveryProgress(delivery, today);
+  const overdue = stage === 'en_route' && daysUntil(delivery.expectedDate, today) < 0;
+  const stageTone =
+    stage === 'received' ? 'bg-emerald-500' : stage === 'en_route' ? 'bg-sky-500' : 'bg-zinc-400';
+
+  const headline = (() => {
+    if (stage === 'received') return 'Received';
+    if (stage === 'en_route') return overdue ? 'Overdue' : 'Heading your way...';
+    return 'Scheduled';
+  })();
+
+  // The estimated window is the donor's own stated words, never a computed
+  // ETA — falls back to the calendar date when they didn't give one.
+  const subtext = (() => {
+    if (stage === 'received' && delivery.receivedDate) {
+      return `Logged ${fullDate(delivery.receivedDate)}`;
+    }
+    if (delivery.estimatedWindow) return `Estimated arrival ${delivery.estimatedWindow}`;
+    if (overdue) return `Was expected ${fullDate(delivery.expectedDate)}`;
+    return `Expected ${fullDate(delivery.expectedDate)}`;
+  })();
+
+  const latestLine = (() => {
+    if (stage === 'received') return null;
+    if (delivery.latestWindow) return `Latest arrival by ${delivery.latestWindow}`;
+    if (delivery.note) return `Donor's window: ${delivery.note}`;
+    return null;
+  })();
+
+  return (
+    <div className="px-3 pb-3 pt-3.5">
+      <h3 className="text-xl font-bold text-zinc-950">{headline}</h3>
+      <p className="mt-0.5 text-sm text-zinc-500">{subtext}</p>
+
+      <SegmentedBar progress={progress} tone={stageTone} />
+
+      {latestLine && (
+        <p className="mt-2.5 flex items-start gap-1.5 text-xs text-zinc-500">
+          <Icon name="clock" size={12} className="mt-0.5 shrink-0 text-zinc-400" />
+          <span>{latestLine}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+export function DeliveryDetail({
+  delivery,
+  today,
+  onReceive,
+}: {
+  delivery: Delivery;
+  today: string;
+  onReceive: () => void;
+}) {
+  return (
+    <div className="flex flex-col">
+      <StatusHeader delivery={delivery} today={today} />
+
+      <div className="space-y-2 border-t border-zinc-200 px-3 py-3">
+        {delivery.courierName && (
+          <CourierBadge name={delivery.courierName} phone={delivery.courierPhone} />
+        )}
+
+        <ManifestDisclosure delivery={delivery} />
+
+        <Button className="w-full" onClick={onReceive}>
+          <Icon name="inbox" size={14} /> Receive
+        </Button>
+      </div>
+    </div>
+  );
+}

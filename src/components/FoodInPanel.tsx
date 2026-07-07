@@ -1,51 +1,25 @@
-import { useState } from 'react';
-import type { Delivery, PerishTier } from '../domain/types';
-import { daysUntil } from '../domain/dates';
+import { useState, type ReactNode } from 'react';
+import type { Delivery } from '../domain/types';
 import { useStore } from '../store/useStore';
 import { useUI } from '../store/useUI';
-import { Button, Card, Icon, TeamBadge } from '../ui/primitives';
-import { TIER_META } from '../ui/format';
-import {
-  CrossCheckItems,
-  ItemChip,
-  MetricTab,
-  METADATA_MIN_H,
-  TileHeader,
-  timingLabel,
-} from './FlowTileVisuals';
-import { DeliveryTrackerMap } from './DeliveryTrackerMap';
+import { Button, Card, Icon } from '../ui/primitives';
+import { DeliveryRow, PickupRow, TileHeader } from './FlowTileVisuals';
+import { DonorDetailModal } from './DonorDetailModal';
 import { cn } from '../ui/cn';
 
-/** A delivery has many items, possibly mixed tiers — show the single MOST
- *  urgent handling class present (prepared > fresh > shelf_stable, the same
- *  priority TIER_META already encodes), so the chip's icon means something
- *  real rather than an arbitrary default. */
-function mostUrgentTier(delivery: Delivery): PerishTier {
-  let best: PerishTier = 'shelf_stable';
-  let bestOrder = TIER_META.shelf_stable.order;
-  for (const item of delivery.items) {
-    const order = TIER_META[item.tier].order;
-    if (order < bestOrder) {
-      best = item.tier;
-      bestOrder = order;
-    }
-  }
-  return best;
-}
-
 /* ─────────────────────────────────────────────────────────
- * FOOD IN — full width, Google-Maps-style split: information on the left
- * (parent toggle, item selector, metadata, footer), the map filling the
- * right column at full height (`items-stretch` on the grid — the map isn't
- * squeezed into a leftover flex-1 sliver anymore, it IS the right column).
- *
- * Two-level selection: a PARENT toggle (Pickups vs. Deliveries — same two
- * real, never-lumped categories as before), then — only when the active
- * category has more than one item — a row of item chips to pick WHICH
- * scheduled pickup/delivery the metadata and map are currently showing.
+ * FOOD IN — two plain list cards side by side (Inbound deliveries, Scheduled
+ * pickups), each row bespoke to its own type — same split as the "See more"
+ * modal (PickupDetail vs. DeliveryDetail), just one level up. A delivery
+ * shows its own arrival window + a stepper-toned progress bar; a pickup
+ * shows a manifest summary + when it's expected (Ready / Tomorrow / a
+ * date). The map, full stage, courier, manifest, and CTA still live in the
+ * modal — this is glance-level triage only. Deliveries and pickups stay two
+ * separate cards, never merged into one list: a delivery is the donor
+ * coming to us, a pickup is one of ours driving out, and collapsing that
+ * distinction into one undifferentiated row is exactly how a pickup that
+ * needs OUR initiative gets missed.
  * ───────────────────────────────────────────────────────── */
-
-type InTab = 'pickup' | 'delivery';
 
 /** Donor name, disambiguated with an index suffix only when the same name
  *  appears more than once in the list (rare, but two trips from one donor on
@@ -63,20 +37,39 @@ function chipLabels(list: Delivery[]): string[] {
   });
 }
 
-function resolveSelected(list: Delivery[], selectedId: string | null): Delivery | undefined {
-  if (selectedId) {
-    const found = list.find((d) => d.id === selectedId);
-    if (found) return found;
-  }
-  return list[0];
+function CardShell({
+  icon,
+  title,
+  count,
+  emptyText,
+  isEmpty,
+  children,
+}: {
+  icon: 'inbox' | 'truck';
+  title: string;
+  count: number;
+  emptyText: string;
+  isEmpty: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <Card className="p-4 sm:p-5">
+      <div className="eyebrow flex items-center gap-1.5 text-[11px] font-bold text-zinc-500">
+        <Icon name={icon} size={13} />
+        {title}
+        <span className="nums text-zinc-400">· {count}</span>
+      </div>
+      <div className="mt-2 space-y-0.5">
+        {isEmpty ? <p className="px-1.5 py-1.5 text-sm text-zinc-500">{emptyText}</p> : children}
+      </div>
+    </Card>
+  );
 }
 
-export function FoodInPanel() {
+export function FoodInPanel({ embedded = false }: { embedded?: boolean } = {}) {
   const { deliveries, team, today } = useStore();
   const { navigate, openReceive, openExpect, openIntake } = useUI();
-  const [inTab, setInTab] = useState<InTab>('pickup'); // we default to pickups
-  const [selectedPickupId, setSelectedPickupId] = useState<string | null>(null);
-  const [selectedDeliveryId, setSelectedDeliveryId] = useState<string | null>(null);
+  const [modalId, setModalId] = useState<string | null>(null);
 
   const member = (id?: string) => team.find((t) => t.id === id);
 
@@ -90,120 +83,76 @@ export function FoodInPanel() {
     .filter((d) => d.mode === 'we_go')
     .sort((a, b) => a.expectedDate.localeCompare(b.expectedDate));
 
-  const activeList = inTab === 'pickup' ? ourPickups : incomingDeliveries;
-  const selectedIn =
-    inTab === 'pickup'
-      ? resolveSelected(ourPickups, selectedPickupId)
-      : resolveSelected(incomingDeliveries, selectedDeliveryId);
-  const setSelected = inTab === 'pickup' ? setSelectedPickupId : setSelectedDeliveryId;
-  const labels = chipLabels(activeList);
+  const modalDelivery = expected.find((d) => d.id === modalId) ?? null;
+  const deliveryLabels = chipLabels(incomingDeliveries);
+  const pickupLabels = chipLabels(ourPickups);
 
   return (
-    <Card className="p-4 sm:p-5">
-      <TileHeader icon="truck" label="Food in" onClick={() => navigate('intake')} />
-
-      <div className="mt-3 grid items-stretch gap-4 lg:grid-cols-5">
-        {/* LEFT — KPIs, item selector, metadata, footer */}
-        <div className="flex flex-col lg:col-span-2">
-          {/* Parent toggle — 2 clickable tabs. */}
-          <div className="flex items-start gap-2">
-            <MetricTab
-              active={inTab === 'pickup'}
-              n={ourPickups.length}
-              label={ourPickups.length === 1 ? 'pickup (we go)' : 'pickups (we go)'}
-              onClick={() => setInTab('pickup')}
-            />
-            <MetricTab
-              active={inTab === 'delivery'}
-              n={incomingDeliveries.length}
-              label={incomingDeliveries.length === 1 ? 'delivery' : 'deliveries'}
-              onClick={() => setInTab('delivery')}
-            />
-          </div>
-
-          {/* Item selector — only when there's more than one to choose from. */}
-          {activeList.length > 1 && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {activeList.map((d, i) => (
-                <ItemChip
-                  key={d.id}
-                  tier={mostUrgentTier(d)}
-                  label={labels[i]}
-                  selected={d.id === selectedIn?.id}
-                  onClick={() => setSelected(d.id)}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Metadata — fixed height regardless of selection; overflow clips
-              rather than growing the box if content wraps at a narrow width. */}
-          <div className={cn('mt-2 overflow-hidden', METADATA_MIN_H)}>
-            {selectedIn ? (
-              inTab === 'pickup' ? (
-                <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-zinc-600">
-                  <span className="font-medium text-zinc-900">{selectedIn.donorName}</span>
-                  <span>is ready for pickup</span>
-                  {(() => {
-                    const assignee = member(selectedIn.assigneeId);
-                    return assignee ? <TeamBadge id={assignee.id} name={assignee.name} /> : null;
-                  })()}
-                  {selectedIn.note && <span className="text-zinc-400">· {selectedIn.note}</span>}
-                </p>
-              ) : (
-                <>
-                  <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-zinc-600">
-                    <span className="font-medium text-zinc-900">{selectedIn.donorName}</span>
-                    <span>
-                      delivering{' '}
-                      <span className="font-medium text-zinc-700">
-                        {selectedIn.note ?? timingLabel(daysUntil(selectedIn.expectedDate, today))}
-                      </span>
-                    </span>
-                    {/* No avatar here — anyone can receive a delivery. */}
-                  </p>
-                  <CrossCheckItems delivery={selectedIn} />
-                </>
-              )
-            ) : (
-              <p className="text-sm text-zinc-500">
-                {inTab === 'pickup' ? 'No pickups en route.' : 'No deliveries en route.'}
-              </p>
-            )}
-          </div>
-
-          {/* Footer — pinned to the bottom of the left column, matching the
-              map's height on the right (items-stretch + mt-auto). */}
-          <div className="mt-auto pt-4">
-            {selectedIn ? (
-              <Button className="w-full" onClick={() => openReceive(selectedIn.id)}>
-                <Icon name="inbox" size={14} /> Receive
-              </Button>
-            ) : (
-              <Button className="w-full" variant="outline" onClick={openExpect}>
-                <Icon name="plus" size={14} /> Expect a delivery
-              </Button>
-            )}
+    <div>
+      {!embedded && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <TileHeader icon="truck" label="Inbound" onClick={() => navigate('intake')} />
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={openExpect}>
+              <Icon name="plus" size={13} /> Expect a delivery
+            </Button>
             <button
               onClick={openIntake}
-              className="mt-2 w-full text-center text-xs font-medium text-zinc-400 hover:text-zinc-700"
+              className="text-xs font-medium text-zinc-400 hover:text-zinc-700"
             >
               + Log a walk-in donation
             </button>
           </div>
         </div>
+      )}
 
-        {/* RIGHT — the map, tall, filling the column. */}
-        <div className="min-h-[280px] lg:col-span-3">
-          {selectedIn ? (
-            <DeliveryTrackerMap delivery={selectedIn} today={today} />
-          ) : (
-            <div className="flex h-full min-h-[280px] items-center justify-center rounded-xl border border-dashed border-zinc-300 text-xs text-zinc-400">
-              {inTab === 'pickup' ? 'No pickup en route' : 'No donor en route'}
-            </div>
-          )}
-        </div>
+      <div className={cn(!embedded && 'mt-3', 'grid gap-4 sm:grid-cols-2')}>
+        <CardShell
+          icon="inbox"
+          title="Inbound deliveries"
+          count={incomingDeliveries.length}
+          isEmpty={incomingDeliveries.length === 0}
+          emptyText="No deliveries en route."
+        >
+          {incomingDeliveries.map((d, i) => (
+            <DeliveryRow
+              key={d.id}
+              delivery={d}
+              today={today}
+              label={deliveryLabels[i]}
+              onSeeMore={() => setModalId(d.id)}
+            />
+          ))}
+        </CardShell>
+        <CardShell
+          icon="truck"
+          title="Scheduled pickups"
+          count={ourPickups.length}
+          isEmpty={ourPickups.length === 0}
+          emptyText="No pickups en route."
+        >
+          {ourPickups.map((d, i) => (
+            <PickupRow
+              key={d.id}
+              delivery={d}
+              today={today}
+              label={pickupLabels[i]}
+              onSeeMore={() => setModalId(d.id)}
+            />
+          ))}
+        </CardShell>
       </div>
-    </Card>
+
+      <DonorDetailModal
+        delivery={modalDelivery}
+        today={today}
+        assignee={member(modalDelivery?.assigneeId)}
+        onClose={() => setModalId(null)}
+        onReceive={(id) => {
+          setModalId(null);
+          openReceive(id);
+        }}
+      />
+    </div>
   );
 }

@@ -58,6 +58,18 @@ export function getDeliveryStage(
   return daysUntil(delivery.expectedDate, today) > 0 ? 'scheduled' : 'en_route';
 }
 
+const STAGE_ORDER: DeliveryStage[] = ['scheduled', 'en_route', 'received'];
+
+// Rough fill per stage — not proportional to real elapsed time (we have none
+// to measure), just enough visual progress to read as "further along."
+// Shared by the modal's full stepper and the muted row-level indicator, so
+// the two always agree on how "close" a delivery reads.
+const STAGE_FILL = [0.1, 0.55, 1];
+
+export function getDeliveryProgress(delivery: Delivery, today: ISODate): number {
+  return STAGE_FILL[STAGE_ORDER.indexOf(getDeliveryStage(delivery, today))];
+}
+
 /** Build a fresh draft line for the promise / dock editors. */
 export function makeDeliveryItem(
   today: ISODate,

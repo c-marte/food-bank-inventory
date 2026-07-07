@@ -24,7 +24,9 @@ const ICON_PATHS: Record<
   | 'box'
   | 'truck'
   | 'pin'
-  | 'home',
+  | 'home'
+  | 'user'
+  | 'phone',
   ReactNode
 > = {
   check: <path d="M20 6 9 17l-5-5" />,
@@ -113,6 +115,15 @@ const ICON_PATHS: Record<
       <path d="M3 11.5 12 4l9 7.5" />
       <path d="M5 10v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10" />
     </>
+  ),
+  user: (
+    <>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21c0-4 3.5-7 8-7s8 3 8 7" />
+    </>
+  ),
+  phone: (
+    <path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384" />
   ),
 };
 
@@ -242,10 +253,13 @@ function initials(name: string): string {
 }
 
 /**
- * OUR people — volunteers and staff — get a colored initials circle. This is
+ * OUR people — volunteers and staff — get a colored initials CIRCLE. This is
  * the one avatar treatment in the app, and it's deliberately reserved for our
- * team: partners, donors, and family recipients stay plain text, so a glance
- * at a colored circle always means "one of ours is on this."
+ * team, so a glance at a colored circle always means "one of ours is on
+ * this." Donors get a visually distinct SQUARE mark instead (see DonorMark
+ * below) — same idea (a flat monogram, not a person), different shape, so
+ * the two are never confused. Partners and family recipients still stay
+ * plain text; there's no logo asset to stand in for them.
  */
 export function TeamAvatar({
   id,
@@ -270,6 +284,41 @@ export function TeamAvatar({
   );
 }
 
+/**
+ * A photo-style stand-in for OUR people, scoped to one place: the "who's
+ * picking this up" indicator on a pickup row. Deliberately NOT a replacement
+ * for TeamAvatar everywhere else in the app — the colored-initials circle
+ * stays the default team-member treatment; this is a one-off for a row that
+ * asked specifically for a face, not initials. There's no real staff photo
+ * on file, so this uses pravatar.cc (a placeholder-avatar service built for
+ * exactly this — mockup "person photo" avatars), seeded by team id so the
+ * same person always gets the same face rather than a random one per
+ * render. Hover shows the real name via the native title tooltip.
+ */
+export function TeamPhotoAvatar({
+  id,
+  name,
+  size = 26,
+  className,
+}: {
+  id: string;
+  name: string;
+  size?: number;
+  className?: string;
+}) {
+  return (
+    <img
+      src={`https://i.pravatar.cc/64?u=${encodeURIComponent(id)}`}
+      alt=""
+      title={name}
+      width={size}
+      height={size}
+      className={cn('rounded-full object-cover ring-1 ring-white', className)}
+      style={{ width: size, height: size }}
+    />
+  );
+}
+
 /** Avatar + first name, the compact "who owns this" chip used in rows. */
 export function TeamBadge({ id, name }: { id: string; name: string }) {
   return (
@@ -278,6 +327,64 @@ export function TeamBadge({ id, name }: { id: string; name: string }) {
       <span className="text-[11px] font-medium text-zinc-700">
         {name.split(' ')[0]}
       </span>
+    </span>
+  );
+}
+
+// A muted, flat palette for donor marks — deliberately duller than the
+// team-avatar palette (no real logo art exists for seeded/fictional donors,
+// so this is an honest placeholder monogram, not a stand-in for a fetched
+// brand mark; it shouldn't read as vivid or "designed" enough to be mistaken
+// for a real logo).
+const DONOR_PALETTE = ['bg-stone-600', 'bg-slate-600', 'bg-neutral-600', 'bg-zinc-600'];
+
+function donorTone(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
+  return DONOR_PALETTE[Math.abs(hash) % DONOR_PALETTE.length];
+}
+
+/** A flat monogram tile standing in for a donor's logo — square, never the
+ *  circle reserved for TeamAvatar (see above). There's no real logo asset
+ *  for these (fictional/seeded donor names), so this is a deliberately
+ *  plain placeholder mark rather than a fabricated brand asset. */
+export function DonorMark({ name, size = 26 }: { name: string; size?: number }) {
+  const initial = name.trim()[0]?.toUpperCase() ?? '?';
+  return (
+    <span
+      className={cn(
+        'inline-flex shrink-0 items-center justify-center rounded-md font-bold text-white',
+        donorTone(name),
+      )}
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.45) }}
+      title={name}
+      aria-hidden="true"
+    >
+      {initial}
+    </span>
+  );
+}
+
+/** Whoever the DONOR sent to hand off a delivery — a courier, not one of
+ *  ours. Deliberately outline/neutral, never the colored TeamAvatar circle,
+ *  so that signal stays reserved for our own team (see TeamAvatar above). */
+export function CourierBadge({ name, phone }: { name: string; phone?: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-white py-0.5 pl-0.5 pr-2 ring-1 ring-zinc-300">
+      <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-zinc-50 text-zinc-400 ring-1 ring-inset ring-zinc-200">
+        <Icon name="user" size={10} />
+      </span>
+      <span className="text-[11px] font-medium text-zinc-600">{name}</span>
+      <span className="eyebrow text-[9px] font-bold text-zinc-400">COURIER</span>
+      {phone && (
+        <a
+          href={`tel:${phone}`}
+          className="text-zinc-400 transition-colors hover:text-zinc-700"
+          aria-label={`Call ${name}`}
+        >
+          <Icon name="phone" size={11} />
+        </a>
+      )}
     </span>
   );
 }
@@ -299,6 +406,18 @@ export function Card({
     >
       {children}
     </section>
+  );
+}
+
+/** A static "this page is still rough" flag — next to a page H1, never
+ *  interactive, never a status color (that's reserved for lot/delivery
+ *  status). Used on the two pages that got less attention this build
+ *  (Inventory, Distribution) so that's visible, not just implied. */
+export function BetaPill() {
+  return (
+    <span className="eyebrow inline-flex shrink-0 items-center rounded-full border border-zinc-300 bg-zinc-50 px-2 py-0.5 text-[10px] font-bold text-zinc-500">
+      Beta
+    </span>
   );
 }
 
@@ -339,7 +458,7 @@ export function EmptyCard({
 // ---------------------------------------------------------------------------
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: 'primary' | 'outline' | 'ghost' | 'danger';
+  variant?: 'primary' | 'outline' | 'ghost' | 'danger' | 'dark';
   size?: 'sm' | 'md' | 'lg';
 };
 
@@ -357,10 +476,14 @@ export function Button({
     lg: 'h-12 px-5 text-base',
   };
   const variants = {
-    primary: 'bg-zinc-950 text-white hover:bg-zinc-800',
+    primary: 'bg-accent text-white hover:bg-accent-hover',
     outline: 'border border-zinc-300 bg-white text-zinc-950 hover:bg-zinc-50',
     ghost: 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950',
     danger: 'bg-red-600 text-white hover:bg-red-700',
+    // Distribution's primary actions deliberately skip the accent color —
+    // that page didn't get the same design pass as Food In, so it keeps a
+    // neutral dark-gray fill instead of the accent reserved elsewhere.
+    dark: 'bg-zinc-800 text-white hover:bg-zinc-900',
   };
   return (
     <button
