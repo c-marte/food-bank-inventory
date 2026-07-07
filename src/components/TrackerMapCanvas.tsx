@@ -115,7 +115,7 @@ export function TrackerMapCanvas({ delivery }: { delivery: Delivery }) {
       <MapContainer
         key={delivery.id}
         center={center}
-        zoom={13}
+        zoom={14}
         scrollWheelZoom={false}
         zoomControl={false}
         className="h-full w-full"

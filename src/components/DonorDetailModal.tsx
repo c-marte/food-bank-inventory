@@ -34,7 +34,12 @@ export function DonorDetailModal({
             <TrackerMapCanvas delivery={delivery} />
           </div>
           {delivery.mode === 'we_go' ? (
-            <PickupDetail delivery={delivery} assignee={assignee} />
+            <PickupDetail
+              delivery={delivery}
+              today={today}
+              assignee={assignee}
+              onReceive={() => onReceive(delivery.id)}
+            />
           ) : (
             <DeliveryDetail
               delivery={delivery}

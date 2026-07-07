@@ -26,7 +26,9 @@ const ICON_PATHS: Record<
   | 'pin'
   | 'home'
   | 'user'
-  | 'phone',
+  | 'phone'
+  | 'globe'
+  | 'external',
   ReactNode
 > = {
   check: <path d="M20 6 9 17l-5-5" />,
@@ -124,6 +126,19 @@ const ICON_PATHS: Record<
   ),
   phone: (
     <path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384" />
+  ),
+  globe: (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20M2 12h20" />
+    </>
+  ),
+  external: (
+    <>
+      <path d="M15 3h6v6" />
+      <path d="M10 14 21 3" />
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+    </>
   ),
 };
 
@@ -361,30 +376,6 @@ export function DonorMark({ name, size = 26 }: { name: string; size?: number }) 
       aria-hidden="true"
     >
       {initial}
-    </span>
-  );
-}
-
-/** Whoever the DONOR sent to hand off a delivery — a courier, not one of
- *  ours. Deliberately outline/neutral, never the colored TeamAvatar circle,
- *  so that signal stays reserved for our own team (see TeamAvatar above). */
-export function CourierBadge({ name, phone }: { name: string; phone?: string }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-white py-0.5 pl-0.5 pr-2 ring-1 ring-zinc-300">
-      <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-zinc-50 text-zinc-400 ring-1 ring-inset ring-zinc-200">
-        <Icon name="user" size={10} />
-      </span>
-      <span className="text-[11px] font-medium text-zinc-600">{name}</span>
-      <span className="eyebrow text-[9px] font-bold text-zinc-400">COURIER</span>
-      {phone && (
-        <a
-          href={`tel:${phone}`}
-          className="text-zinc-400 transition-colors hover:text-zinc-700"
-          aria-label={`Call ${name}`}
-        >
-          <Icon name="phone" size={11} />
-        </a>
-      )}
     </span>
   );
 }

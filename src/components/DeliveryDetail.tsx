@@ -2,8 +2,7 @@ import { motion } from 'motion/react';
 import type { Delivery } from '../domain/types';
 import { getDeliveryStage, getDeliveryProgress } from '../domain/deliveries';
 import { daysUntil, parseLocalDate } from '../domain/dates';
-import { Button, CourierBadge, Icon } from '../ui/primitives';
-import { ManifestDisclosure } from './FlowTileVisuals';
+import { Button, Icon, TierMark } from '../ui/primitives';
 import { cn } from '../ui/cn';
 import { SPRING } from '../ui/motion';
 
@@ -11,10 +10,15 @@ import { SPRING } from '../ui/motion';
  * DELIVERY's bespoke content for the floating detail panel: an Uber-Eats-
  * style status header (a headline naming the real stage, an arrival window
  * under it, a 5-segment progress bar, then a second window line below the
- * bar), a manifest you can expand for a cross-check, the donor's courier (if
- * named — neutral avatar, never TeamAvatar), and the Receive CTA. Pickup
- * gets none of this — see PickupDetail.tsx. The map itself lives one level
- * up (FoodInPanel/DonorDetailModal), as the backdrop this content sits under.
+ * bar), then the courier and the manifest side by side — both always
+ * visible, never behind a "See more" disclosure, since who's bringing it
+ * and what's in it are the two things that actually matter here, not
+ * secondary details worth hiding. The store info block that pickups show
+ * was deliberately dropped from this modal: the donor's coming to US, so
+ * their address/hours/website aren't the load-bearing fact the way they are
+ * for a pickup (see PickupDetail.tsx, which keeps it). The map itself lives
+ * one level up (FoodInPanel/DonorDetailModal), as the backdrop this content
+ * sits under.
  *
  * The "Estimated arrival" / "Latest arrival" lines are NOT computed ETAs —
  * this app has no GPS, so it can't track a real one. They render
@@ -117,15 +121,52 @@ export function DeliveryDetail({
     <div className="flex flex-col">
       <StatusHeader delivery={delivery} today={today} />
 
-      <div className="space-y-2 border-t border-zinc-200 px-3 py-3">
-        {delivery.courierName && (
-          <CourierBadge name={delivery.courierName} phone={delivery.courierPhone} />
-        )}
+      <div className="grid grid-cols-2 gap-4 border-t border-zinc-200 px-3 py-3">
+        <div>
+          <h4 className="eyebrow text-[11px] font-bold text-zinc-400">Courier</h4>
+          {delivery.courierName ? (
+            <div className="mt-1.5 flex items-start gap-2">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-400 ring-1 ring-inset ring-zinc-200">
+                <Icon name="user" size={17} />
+              </span>
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-zinc-950">
+                  {delivery.courierName}
+                </div>
+                {delivery.courierPhone && (
+                  <a
+                    href={`tel:${delivery.courierPhone}`}
+                    className="text-xs text-zinc-500 hover:text-zinc-800"
+                  >
+                    {delivery.courierPhone}
+                  </a>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p className="mt-1.5 text-xs text-zinc-400">Not named yet.</p>
+          )}
+        </div>
 
-        <ManifestDisclosure delivery={delivery} />
+        <div>
+          <h4 className="eyebrow text-[11px] font-bold text-zinc-400">
+            {delivery.items.length} item{delivery.items.length === 1 ? '' : 's'}
+          </h4>
+          <ul className="mt-1.5 space-y-1.5">
+            {delivery.items.map((it) => (
+              <li key={it.id} className="nums flex items-center gap-1.5 text-sm text-zinc-700">
+                <TierMark tier={it.tier} size={12} />
+                <span className="font-medium">{it.quantity}</span>
+                <span className="truncate">{it.name}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
 
+      <div className="border-t border-zinc-200 px-3 py-3">
         <Button className="w-full" onClick={onReceive}>
-          <Icon name="inbox" size={14} /> Receive
+          <Icon name="inbox" size={14} /> Add to Inventory
         </Button>
       </div>
     </div>

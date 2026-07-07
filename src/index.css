@@ -68,9 +68,10 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Headings only — font-family swap, nothing else. Every h1-h6 already sets
-   its own weight/size/color via Tailwind classes in place; this rule never
-   touches those. */
+/* Headings only — font-family swap. Wherever Geist Pixel is used, it's
+   always bold (the font reads thin/uneven at lighter weights), so this rule
+   sets both together rather than relying on a font-bold class being present
+   on every heading. */
 h1,
 h2,
 h3,
@@ -78,6 +79,14 @@ h4,
 h5,
 h6 {
   font-family: var(--font-pixel);
+  font-weight: 700;
+}
+
+/* Same rule for any non-heading text that opts into the pixel font
+   (e.g. the "Ready" / expiry indicators) — always bold, never a lighter
+   weight, no matter what font-weight utility is also applied. */
+.font-pixel {
+  font-weight: 700 !important;
 }
 
 /* Uppercase, letter-spaced micro-labels used for section headers and columns. */

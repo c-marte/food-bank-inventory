@@ -52,7 +52,7 @@ function Shell() {
       <Sheet
         open={sheet?.kind === 'intake'}
         onClose={closeSheet}
-        title="Walk-in donation"
+        title="Add to Inventory"
       >
         <IntakeForm onDone={closeSheet} />
       </Sheet>

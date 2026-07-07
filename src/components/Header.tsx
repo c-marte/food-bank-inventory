@@ -18,11 +18,14 @@ export function Header() {
 
   return (
     <header>
+      {/* Mobile: pinned to the bottom, laid out horizontally (position and
+          container axis only — the icons inside never rotate). Desktop
+          (sm+): the original left-edge, vertically-centered rail. */}
       <nav
         aria-label="Sections"
-        className="fixed left-4 top-1/2 z-30 -translate-y-1/2 rounded-3xl border border-zinc-200 bg-white p-2 shadow-lg shadow-zinc-900/10"
+        className="fixed bottom-4 left-1/2 z-30 -translate-x-1/2 rounded-3xl border border-zinc-200 bg-white p-2 shadow-lg shadow-zinc-900/10 sm:bottom-auto sm:left-4 sm:top-1/2 sm:translate-x-0 sm:-translate-y-1/2"
       >
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-row gap-1 sm:flex-col">
           {MENU.map((item) => {
             const active = view === item.id;
             return (

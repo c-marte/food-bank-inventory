@@ -277,7 +277,7 @@ export function IntakeForm({ onDone }: { onDone?: () => void }) {
 
         <div className="flex flex-wrap items-center gap-3 border-t border-zinc-100 pt-4">
           <Button type="submit" size="lg" disabled={!canSubmit}>
-            <Icon name="plus" size={16} /> Add donation
+            <Icon name="plus" size={16} /> Add to Inventory
           </Button>
           {onDone && (
             <Button type="button" variant="outline" size="lg" onClick={onDone}>

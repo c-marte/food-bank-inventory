@@ -125,7 +125,7 @@ export function ExpectDeliverySheet({
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title="Expect a delivery">
+    <Sheet open={open} onClose={onClose} title="Record food donation">
       <div className="space-y-5">
         <CaptureBar today={today} onItems={applyCaptured} />
 

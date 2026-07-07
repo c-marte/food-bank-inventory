@@ -1,10 +1,9 @@
-import { useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import type { Delivery, DeliveryItem, PerishTier } from '../domain/types';
 import { getDeliveryStage, getDeliveryProgress } from '../domain/deliveries';
 import { daysUntil } from '../domain/dates';
 import { FOOD_GROUPS, FOOD_GROUP_ICON, foodGroupFor, type FoodGroup } from '../domain/foodGroups';
-import { DonorMark, Icon, TierMark } from '../ui/primitives';
+import { DonorMark, Icon } from '../ui/primitives';
 import { TIER_META, fullDateLabel } from '../ui/format';
 import { cn } from '../ui/cn';
 import { SPRING } from '../ui/motion';
@@ -227,36 +226,6 @@ export function PickupRow({
   );
 }
 
-/** Collapsed by default: a one-line count, expanding to the full cross-check
- *  list on demand. The manifest is real data either way — this only controls
- *  how much of it is visible at once. */
-export function ManifestDisclosure({ delivery }: { delivery: Delivery }) {
-  const [open, setOpen] = useState(false);
-  const n = delivery.items.length;
-  return (
-    <div>
-      {/* Underlined, not just a color shift — color stays reserved for
-          status elsewhere in this app (the stepper's sky "en route" dot
-          sits right next to this on the delivery side), so the one
-          interactive piece of muted text here is set apart by decoration,
-          not by borrowing a status hue. */}
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1 text-xs font-semibold text-zinc-700 underline decoration-zinc-300 underline-offset-2 transition-colors hover:text-zinc-950 hover:decoration-zinc-500"
-        aria-expanded={open}
-      >
-        <Icon
-          name="chevron"
-          size={10}
-          className={cn('transition-transform', open && 'rotate-90')}
-        />
-        {n} item{n === 1 ? '' : 's'} in manifest
-      </button>
-      {open && <CrossCheckItems delivery={delivery} />}
-    </div>
-  );
-}
-
 /** Food Out's KPI block — same box/typography as MetricTab, but static (not a
  *  tab) and always plain black: no urgency color on the large number. */
 export function KpiBlock({ n, label }: { n: number; label: string }) {
@@ -264,22 +233,6 @@ export function KpiBlock({ n, label }: { n: number; label: string }) {
     <div className="flex-1 min-w-0 rounded-lg px-2.5 py-1.5 text-left">
       <Count n={n} />
       <div className="truncate text-xs text-zinc-500">{label}</div>
-    </div>
-  );
-}
-
-/** The delivery's manifest, so the receiver can cross-check what arrives
- *  against what was promised. */
-export function CrossCheckItems({ delivery }: { delivery: Delivery }) {
-  return (
-    <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-zinc-500">
-      {delivery.items.map((it, i) => (
-        <span key={it.id} className="nums inline-flex items-center gap-1">
-          {i > 0 && <span className="text-zinc-300">·</span>}
-          <TierMark tier={it.tier} size={11} />
-          {it.quantity} {it.name}
-        </span>
-      ))}
     </div>
   );
 }

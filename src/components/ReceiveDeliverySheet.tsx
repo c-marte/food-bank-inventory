@@ -65,7 +65,7 @@ export function ReceiveDeliverySheet({
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title={`Receive · ${delivery.donorName}`}>
+    <Sheet open={open} onClose={onClose} title={`Add to Inventory · ${delivery.donorName}`}>
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500">
           <span className="inline-flex items-center gap-1.5">
@@ -217,8 +217,8 @@ export function ReceiveDeliverySheet({
 
         <div className="flex flex-wrap items-center gap-3 border-t border-zinc-100 pt-4">
           <Button size="lg" onClick={confirm} disabled={kept.length === 0}>
-            <Icon name="check" size={16} /> Receive {kept.length} lot
-            {kept.length === 1 ? '' : 's'}
+            <Icon name="check" size={16} /> Add {kept.length} lot
+            {kept.length === 1 ? '' : 's'} to Inventory
           </Button>
           <span className="text-xs text-zinc-400">
             {unconfirmed > 0

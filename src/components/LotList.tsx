@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import type { Category, Config, InventoryLot, ISODate } from '../domain/types';
-import { CATEGORY_LABELS } from '../domain/types';
 import { daysUntil } from '../domain/dates';
 import { getLotStatus } from '../domain/status';
 import {
@@ -12,9 +11,32 @@ import {
 } from '../domain/foodGroups';
 import { useStore } from '../store/useStore';
 import { useUI } from '../store/useUI';
-import { BetaPill, Card, Icon, SectionHeader, StatusBadge } from '../ui/primitives';
-import { STATUS_META, fullDateLabel, shortDayLabel } from '../ui/format';
+import { BetaPill, Button, Card, Icon, SectionHeader } from '../ui/primitives';
 import { cn } from '../ui/cn';
+
+/** Three plain calendar-day tiers for the expiry indicator — deliberately
+ *  NOT the tier-aware STATUS_META window used elsewhere (that one varies by
+ *  handling tier, e.g. a prepared tray's "soon" is 1-2 days vs. a can's is
+ *  weeks). This is a simpler, always-the-same-thresholds read specifically
+ *  for this row: expired (red), due this week or next (orange), further out
+ *  (neutral gray) — matching what was asked for, not the existing status
+ *  system. */
+type ExpiryTone = 'expired' | 'soon' | 'later';
+
+const EXPIRY_TONE_CLASS: Record<ExpiryTone, string> = {
+  expired: 'text-red-600',
+  soon: 'text-orange-600',
+  later: 'text-zinc-500',
+};
+
+function expiryIndicator(daysAway: number): { text: string; tone: ExpiryTone } {
+  if (daysAway < 0) return { text: 'Expired', tone: 'expired' };
+  if (daysAway === 0) return { text: 'Expiring today', tone: 'soon' };
+  if (daysAway === 1) return { text: 'Expiring tomorrow', tone: 'soon' };
+  if (daysAway <= 14) return { text: `Expiring in ${daysAway} days`, tone: 'soon' };
+  if (daysAway <= 60) return { text: `Expiring in ${Math.round(daysAway / 7)} weeks`, tone: 'later' };
+  return { text: `Expiring in ${Math.round(daysAway / 30)} months`, tone: 'later' };
+}
 
 /* ─────────────────────────────────────────────────────────
  * The three food groups (see domain/foodGroups.ts) drive this page's whole
@@ -30,7 +52,6 @@ interface LotGroup {
   category: Category;
   foodGroup: FoodGroup;
   lots: InventoryLot[];
-  totalInStock: number;
   urgency: number;
 }
 
@@ -57,9 +78,6 @@ function buildGroups(
     const sorted = [...ls].sort(
       (a, b) => a.expiryDate.localeCompare(b.expiryDate) || a.id.localeCompare(b.id),
     );
-    const totalInStock = sorted
-      .filter((l) => getLotStatus(l, today, config) !== 'expired')
-      .reduce((sum, l) => sum + l.quantity, 0);
     const actionable = sorted.filter(
       (l) => l.quantity > 0 && getLotStatus(l, today, config) !== 'expired',
     );
@@ -71,7 +89,6 @@ function buildGroups(
       category: sorted[0].category,
       foodGroup: foodGroupFor(sorted[0]),
       lots: sorted,
-      totalInStock,
       urgency,
     };
   });
@@ -83,7 +100,7 @@ function buildGroups(
 
 export function LotList() {
   const { lots, today, config } = useStore();
-  const { openLot, expiredOnly, setExpiredOnly } = useUI();
+  const { openLot, openIntake, expiredOnly, setExpiredOnly } = useUI();
   const [filter, setFilter] = useState<FoodGroup | 'all'>('all');
 
   const groups = useMemo(
@@ -100,13 +117,21 @@ export function LotList() {
     <div className="space-y-4">
       <div>
         <div className="flex items-center gap-2">
-          <h1 className="text-xl font-medium tracking-tight text-zinc-950">Inventory</h1>
+          <h1 className="text-xl font-bold tracking-tight text-zinc-950">Inventory</h1>
           <BetaPill />
         </div>
         <p className="mt-0.5 text-sm text-zinc-500">
           Every lot on the shelf, grouped by handling urgency. Same-name lots
           from different donations are never merged — expiry dates differ.
         </p>
+      </div>
+
+      {/* Same position as Inbound's primary action: directly under the
+          subheader, above the hero. */}
+      <div>
+        <Button size="lg" onClick={openIntake}>
+          <Icon name="plus" size={16} /> Add to Inventory
+        </Button>
       </div>
 
       {/* Full-width pixel-art hero, matching the Intake page's treatment. */}
@@ -172,22 +197,18 @@ export function LotList() {
                     groupItems.map((group) => (
                       <div key={group.name} className="py-2.5">
                         <div className="flex items-baseline justify-between gap-2">
-                          <div className="flex min-w-0 items-baseline gap-2">
-                            {/* Downgraded on purpose — the item name is the
-                                least urgent fact in this row; status/expiry
-                                (in each LotRow below) is what a shelf-keeper
-                                actually needs first. */}
-                            <span className="truncate text-xs font-medium text-zinc-500">
-                              {group.name}
-                            </span>
-                            <span className="eyebrow text-[10px] text-zinc-400">
-                              {CATEGORY_LABELS[group.category]}
-                            </span>
-                          </div>
-                          <span className="nums shrink-0 text-xs text-zinc-500">
-                            {group.totalInStock} in stock
-                            {group.lots.length > 1 ? ` · ${group.lots.length} lots` : ''}
+                          {/* Downgraded on purpose — the item name is the
+                              least urgent fact in this row; the expiry
+                              indicator in each LotRow below is what a
+                              shelf-keeper actually needs first. */}
+                          <span className="truncate text-xs font-medium text-zinc-500">
+                            {group.name}
                           </span>
+                          {group.lots.length > 1 && (
+                            <span className="nums shrink-0 text-xs text-zinc-400">
+                              {group.lots.length} lots
+                            </span>
+                          )}
                         </div>
 
                         <ul className="mt-1.5 space-y-0.5">
@@ -196,7 +217,6 @@ export function LotList() {
                               key={lot.id}
                               lot={lot}
                               today={today}
-                              config={config}
                               onOpen={() => openLot(lot.id)}
                             />
                           ))}
@@ -246,17 +266,15 @@ function FilterChip({
 function LotRow({
   lot,
   today,
-  config,
   onOpen,
 }: {
   lot: InventoryLot;
   today: ISODate;
-  config: Config;
   onOpen: () => void;
 }) {
-  const status = getLotStatus(lot, today, config);
   const d = daysUntil(lot.expiryDate, today);
   const empty = lot.quantity === 0;
+  const indicator = expiryIndicator(d);
 
   // The whole row opens the lot's verb layer — send / waste / adjust all live
   // in the one action sheet, same as everywhere else in the app.
@@ -270,26 +288,23 @@ function LotRow({
         )}
         aria-label={`${lot.name}, ${empty ? 'empty' : `${lot.quantity} ${lot.unit}`}. Open actions.`}
       >
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <StatusBadge status={status} />
-            <span className="nums text-[13px] text-zinc-500">
-              exp {fullDateLabel(lot.expiryDate)}
-              <span className={cn('ml-1.5 font-semibold', STATUS_META[status].text)}>
-                {shortDayLabel(d)}
-              </span>
-            </span>
-          </div>
-          <div className="nums mt-1 text-xs text-zinc-500">
-            {empty ? (
-              <span className="text-zinc-400">0 remaining</span>
-            ) : (
-              <>
-                {lot.quantity} <span className="text-zinc-400">{lot.unit}</span>
-              </>
-            )}
-          </div>
+        <div className="nums min-w-0 flex-1 text-xs text-zinc-500">
+          {empty ? (
+            <span className="text-zinc-400">0 remaining</span>
+          ) : (
+            <>
+              {lot.quantity} <span className="text-zinc-400">{lot.unit}</span>
+            </>
+          )}
         </div>
+        <span
+          className={cn(
+            'eyebrow font-pixel shrink-0 text-xs font-bold',
+            EXPIRY_TONE_CLASS[indicator.tone],
+          )}
+        >
+          {indicator.text}
+        </span>
         <Icon
           name="chevron"
           size={15}

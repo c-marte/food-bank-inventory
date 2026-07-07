@@ -19,7 +19,7 @@ export function IntakePage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-medium tracking-tight text-zinc-950">Inbound</h1>
+        <h1 className="text-xl font-bold tracking-tight text-zinc-950">Inbound</h1>
         <p className="mt-0.5 text-sm text-zinc-500">
           Log what's coming when the donor calls; verify it at the dock when it
           arrives. Walk-ins are the exception — quick-add those directly.
@@ -31,7 +31,7 @@ export function IntakePage() {
           <Icon name="inbox" size={16} /> Record donation
         </Button>
         <Button size="lg" variant="ghost" onClick={openIntake}>
-          <Icon name="plus" size={16} /> Walk-in
+          <Icon name="plus" size={16} /> Add to Inventory
         </Button>
         {receivedToday > 0 && (
           <span className="ml-auto text-xs text-zinc-400">
