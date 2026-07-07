@@ -40,7 +40,7 @@ interface UIValue {
 const UIContext = createContext<UIValue | null>(null);
 
 export function UIProvider({ children }: { children: ReactNode }) {
-  const [view, setView] = useState<View>('shelf');
+  const [view, setView] = useState<View>('intake');
   const [sheet, setSheet] = useState<SheetState>(null);
   const [expiredOnly, setExpiredOnly] = useState(false);
 

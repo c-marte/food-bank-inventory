@@ -148,6 +148,11 @@ export interface Delivery {
   assigneeId?: string;
   note?: string;
   items: DeliveryItem[];
+  /** they_come only: whoever the donor sent to physically hand it over — not
+   *  one of ours. Gets a neutral avatar, never TeamAvatar (colored circles
+   *  are reserved for our own team, see ui/primitives.tsx `TeamAvatar`). */
+  courierName?: string;
+  courierPhone?: string;
 }
 
 /** A recorded discard: food physically pulled from the shelf and tossed.

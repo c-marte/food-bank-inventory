@@ -3,18 +3,17 @@ import type { Delivery, PerishTier } from '../domain/types';
 import { daysUntil } from '../domain/dates';
 import { useStore } from '../store/useStore';
 import { useUI } from '../store/useUI';
-import { Button, Card, Icon, TeamBadge } from '../ui/primitives';
+import { Button, Card, Icon } from '../ui/primitives';
 import { TIER_META } from '../ui/format';
-import {
-  CrossCheckItems,
-  ItemChip,
-  MetricTab,
-  METADATA_MIN_H,
-  TileHeader,
-  timingLabel,
-} from './FlowTileVisuals';
-import { DeliveryTrackerMap } from './DeliveryTrackerMap';
-import { cn } from '../ui/cn';
+import { DonorListRow, TileHeader, TypeTab } from './FlowTileVisuals';
+import { PickupDetail } from './PickupDetail';
+import { DeliveryDetail } from './DeliveryDetail';
+
+function timingLabel(daysAway: number): string {
+  if (daysAway <= 0) return 'today';
+  if (daysAway === 1) return 'tomorrow';
+  return `in ${daysAway} days`;
+}
 
 /** A delivery has many items, possibly mixed tiers — show the single MOST
  *  urgent handling class present (prepared > fresh > shelf_stable, the same
@@ -34,15 +33,14 @@ function mostUrgentTier(delivery: Delivery): PerishTier {
 }
 
 /* ─────────────────────────────────────────────────────────
- * FOOD IN — full width, Google-Maps-style split: information on the left
- * (parent toggle, item selector, metadata, footer), the map filling the
- * right column at full height (`items-stretch` on the grid — the map isn't
- * squeezed into a leftover flex-1 sliver anymore, it IS the right column).
- *
- * Two-level selection: a PARENT toggle (Pickups vs. Deliveries — same two
- * real, never-lumped categories as before), then — only when the active
- * category has more than one item — a row of item chips to pick WHICH
- * scheduled pickup/delivery the metadata and map are currently showing.
+ * FOOD IN — the left column is now a pure nav rail: a [Pickups · n]
+ * [Deliveries · n] toggle over an always-visible donor list (no hero-count
+ * KPIs, no chips that vanish when there's only one item), then a tertiary
+ * link out to the full Intake page. The right column is the bespoke detail
+ * for whichever type is active — PickupDetail and DeliveryDetail are
+ * deliberately separate components, not one template branching internally,
+ * because a pickup (awaiting our initiative) and a delivery (an inbound
+ * journey with real stages) are different enough jobs to earn different UI.
  * ───────────────────────────────────────────────────────── */
 
 type InTab = 'pickup' | 'delivery';
@@ -103,83 +101,51 @@ export function FoodInPanel() {
       <TileHeader icon="truck" label="Food in" onClick={() => navigate('intake')} />
 
       <div className="mt-3 grid items-stretch gap-4 lg:grid-cols-5">
-        {/* LEFT — KPIs, item selector, metadata, footer */}
+        {/* LEFT — nav rail: type toggle, always-visible donor list, tertiary link. */}
         <div className="flex flex-col lg:col-span-2">
-          {/* Parent toggle — 2 clickable tabs. */}
           <div className="flex items-start gap-2">
-            <MetricTab
+            <TypeTab
               active={inTab === 'pickup'}
               n={ourPickups.length}
-              label={ourPickups.length === 1 ? 'pickup (we go)' : 'pickups (we go)'}
+              label="Pickups"
               onClick={() => setInTab('pickup')}
             />
-            <MetricTab
+            <TypeTab
               active={inTab === 'delivery'}
               n={incomingDeliveries.length}
-              label={incomingDeliveries.length === 1 ? 'delivery' : 'deliveries'}
+              label="Deliveries"
               onClick={() => setInTab('delivery')}
             />
           </div>
 
-          {/* Item selector — only when there's more than one to choose from. */}
-          {activeList.length > 1 && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {activeList.map((d, i) => (
-                <ItemChip
+          <div className="mt-2 flex-1 space-y-0.5">
+            {activeList.length > 0 ? (
+              activeList.map((d, i) => (
+                <DonorListRow
                   key={d.id}
                   tier={mostUrgentTier(d)}
                   label={labels[i]}
+                  timing={timingLabel(daysUntil(d.expectedDate, today))}
                   selected={d.id === selectedIn?.id}
                   onClick={() => setSelected(d.id)}
                 />
-              ))}
-            </div>
-          )}
-
-          {/* Metadata — fixed height regardless of selection; overflow clips
-              rather than growing the box if content wraps at a narrow width. */}
-          <div className={cn('mt-2 overflow-hidden', METADATA_MIN_H)}>
-            {selectedIn ? (
-              inTab === 'pickup' ? (
-                <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-zinc-600">
-                  <span className="font-medium text-zinc-900">{selectedIn.donorName}</span>
-                  <span>is ready for pickup</span>
-                  {(() => {
-                    const assignee = member(selectedIn.assigneeId);
-                    return assignee ? <TeamBadge id={assignee.id} name={assignee.name} /> : null;
-                  })()}
-                  {selectedIn.note && <span className="text-zinc-400">· {selectedIn.note}</span>}
-                </p>
-              ) : (
-                <>
-                  <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-zinc-600">
-                    <span className="font-medium text-zinc-900">{selectedIn.donorName}</span>
-                    <span>
-                      delivering{' '}
-                      <span className="font-medium text-zinc-700">
-                        {selectedIn.note ?? timingLabel(daysUntil(selectedIn.expectedDate, today))}
-                      </span>
-                    </span>
-                    {/* No avatar here — anyone can receive a delivery. */}
-                  </p>
-                  <CrossCheckItems delivery={selectedIn} />
-                </>
-              )
+              ))
             ) : (
-              <p className="text-sm text-zinc-500">
+              <p className="px-2 py-1.5 text-sm text-zinc-500">
                 {inTab === 'pickup' ? 'No pickups en route.' : 'No deliveries en route.'}
               </p>
             )}
           </div>
 
-          {/* Footer — pinned to the bottom of the left column, matching the
-              map's height on the right (items-stretch + mt-auto). */}
+          <button
+            onClick={() => navigate('intake')}
+            className="mt-2 self-start text-xs font-medium text-zinc-400 hover:text-zinc-700"
+          >
+            View all in Intake →
+          </button>
+
           <div className="mt-auto pt-4">
-            {selectedIn ? (
-              <Button className="w-full" onClick={() => openReceive(selectedIn.id)}>
-                <Icon name="inbox" size={14} /> Receive
-              </Button>
-            ) : (
+            {activeList.length === 0 && (
               <Button className="w-full" variant="outline" onClick={openExpect}>
                 <Icon name="plus" size={14} /> Expect a delivery
               </Button>
@@ -193,10 +159,18 @@ export function FoodInPanel() {
           </div>
         </div>
 
-        {/* RIGHT — the map, tall, filling the column. */}
+        {/* RIGHT — bespoke detail, tall, filling the column. */}
         <div className="min-h-[280px] lg:col-span-3">
           {selectedIn ? (
-            <DeliveryTrackerMap delivery={selectedIn} today={today} />
+            inTab === 'pickup' ? (
+              <PickupDetail delivery={selectedIn} assignee={member(selectedIn.assigneeId)} />
+            ) : (
+              <DeliveryDetail
+                delivery={selectedIn}
+                today={today}
+                onReceive={() => openReceive(selectedIn.id)}
+              />
+            )
           ) : (
             <div className="flex h-full min-h-[280px] items-center justify-center rounded-xl border border-dashed border-zinc-300 text-xs text-zinc-400">
               {inTab === 'pickup' ? 'No pickup en route' : 'No donor en route'}

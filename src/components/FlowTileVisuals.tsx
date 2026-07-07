@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import type { Delivery, PerishTier } from '../domain/types';
 import { Icon, TierMark } from '../ui/primitives';
@@ -12,9 +13,10 @@ import { SPRING } from '../ui/motion';
  * number+label KPI block (as a tab or static), the fixed-height metadata
  * row, and the delivery cross-check list. Food Out's visual anchor (the
  * Pack → Match → Handoff connector) also lives here. Food In's used to
- * (a stylized, non-live illustration), but it's now DeliveryTrackerMap.tsx —
- * a real, interactive Leaflet map, since Food In is where this build's
- * remaining polish is going. Food Out deliberately keeps its simpler
+ * (a stylized, non-live illustration), but it's now TrackerMapCanvas.tsx —
+ * a real, interactive Leaflet map wrapped by bespoke per-mode chrome in
+ * PickupDetail.tsx / DeliveryDetail.tsx — since Food In is where this
+ * build's remaining polish is going. Food Out deliberately keeps its simpler
  * treatment: no real multi-stage fulfillment pipeline exists to track (a
  * movement is pending, then released — that's the whole state machine), so
  * the status board stays an AGGREGATE of today's real, independent counts,
@@ -25,12 +27,6 @@ import { SPRING } from '../ui/motion';
  *  delivery selection, which adds a cross-check item list), so the row never
  *  changes height as its content changes. */
 export const METADATA_MIN_H = 'min-h-14';
-
-export function timingLabel(daysAway: number): string {
-  if (daysAway <= 0) return 'today';
-  if (daysAway === 1) return 'tomorrow';
-  return `in ${daysAway} days`;
-}
 
 /** A panel's title, itself the click-through to its full surface (Intake /
  *  Distribution) — one affordance instead of a separate "View X" link. */
@@ -81,9 +77,12 @@ export function Count({ n }: { n: number }) {
   );
 }
 
-/** A clickable KPI metric — Food In's Pickup/Delivery parent toggle. Active =
- *  the tab driving the metadata + map below; inactive invites the click. */
-export function MetricTab({
+/** Food In's Pickup/Delivery parent toggle — deliberately NOT a hero-count
+ *  KPI (that's what it replaced). A compact pill; the count is a plain
+ *  inline number, not the giant `Count` treatment reserved for standalone
+ *  metrics. Selection drives the always-visible donor list + bespoke detail
+ *  panel below/beside it. */
+export function TypeTab({
   active,
   n,
   label,
@@ -99,15 +98,79 @@ export function MetricTab({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        'flex-1 min-w-0 rounded-lg px-2.5 py-1.5 text-left transition-colors',
+        'flex-1 min-w-0 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold transition-colors',
         active
-          ? 'bg-zinc-50 ring-1 ring-zinc-950'
-          : 'opacity-50 hover:bg-zinc-50 hover:opacity-100',
+          ? 'bg-zinc-950 text-white'
+          : 'bg-zinc-50 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800',
       )}
     >
-      <Count n={n} />
-      <div className="truncate text-xs text-zinc-500">{label}</div>
+      <span className="nums truncate">
+        {label} <span className={active ? 'text-zinc-400' : 'text-zinc-400'}>·</span> {n}
+      </span>
     </button>
+  );
+}
+
+/** The always-visible donor list row (replaces the old "only show chips when
+ *  there's more than one" behavior — Food In's left column is now a nav
+ *  rail, so the list should never disappear out from under a selection). */
+export function DonorListRow({
+  tier,
+  label,
+  timing,
+  selected,
+  onClick,
+}: {
+  tier: PerishTier;
+  label: string;
+  timing: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={selected}
+      className={cn(
+        'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors',
+        selected ? 'bg-zinc-950 text-white' : 'text-zinc-700 hover:bg-zinc-50',
+      )}
+    >
+      <TierMark
+        tier={tier}
+        size={13}
+        className={selected ? 'text-white/70' : undefined}
+      />
+      <span className="flex-1 truncate text-sm font-medium">{label}</span>
+      <span className={cn('nums shrink-0 text-xs', selected ? 'text-white/60' : 'text-zinc-400')}>
+        {timing}
+      </span>
+    </button>
+  );
+}
+
+/** Collapsed by default: a one-line count, expanding to the full cross-check
+ *  list on demand. The manifest is real data either way — this only controls
+ *  how much of it is visible at once. */
+export function ManifestDisclosure({ delivery }: { delivery: Delivery }) {
+  const [open, setOpen] = useState(false);
+  const n = delivery.items.length;
+  return (
+    <div>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-1 text-xs font-medium text-zinc-500 transition-colors hover:text-zinc-800"
+        aria-expanded={open}
+      >
+        <Icon
+          name="chevron"
+          size={10}
+          className={cn('transition-transform', open && 'rotate-90')}
+        />
+        {n} item{n === 1 ? '' : 's'} in manifest
+      </button>
+      {open && <CrossCheckItems delivery={delivery} />}
+    </div>
   );
 }
 

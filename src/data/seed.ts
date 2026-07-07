@@ -117,6 +117,8 @@ interface SeedDelivery {
   assigneeId?: string;
   note?: string;
   items: SeedDeliveryItem[];
+  courierName?: string;
+  courierPhone?: string;
 }
 
 // prettier-ignore
@@ -132,9 +134,11 @@ const SEED_DELIVERIES: SeedDelivery[] = [
     ],
   },
   {
-    // The grocery rescue drops off; Jo is on the dock to receive it.
+    // The grocery rescue drops off; Jo is on the dock to receive it. Their
+    // driver Ray brings it — a courier, not one of ours.
     id: 'del-2', donorName: 'Stop & Shop', kind: 'recurring', when: 0,
     mode: 'they_come', assigneeId: 'team-3', note: 'usual morning drop',
+    courierName: 'Ray', courierPhone: '+16175550142',
     items: [
       { name: 'Wheat Bread',      category: 'grains',  quantity: 12, unit: 'loaves',  expiry: 3, tier: 'fresh' },
       { name: 'Bananas',          category: 'produce', quantity: 15, unit: 'bunches', expiry: 4 },
@@ -292,6 +296,8 @@ export function buildSeed(today: ISODate): SeedData {
     mode: d.mode,
     assigneeId: d.assigneeId,
     note: d.note,
+    courierName: d.courierName,
+    courierPhone: d.courierPhone,
     items: d.items.map((it, j) => ({
       id: `${d.id}-item-${j + 1}`,
       name: it.name,

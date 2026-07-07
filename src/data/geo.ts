@@ -37,3 +37,9 @@ export function locationForDonor(name: string): LatLng {
     DOCK_LOCATION[1] + Math.cos(angle) * distanceDeg,
   ];
 }
+
+/** A real Google Maps deep-link, computed by Google, not us — this is the
+ *  honest alternative to a fabricated "drive 12m" chip (see CLAUDE.md). */
+export function directionsUrl(dest: LatLng): string {
+  return `https://www.google.com/maps/dir/?api=1&destination=${dest[0]},${dest[1]}`;
+}

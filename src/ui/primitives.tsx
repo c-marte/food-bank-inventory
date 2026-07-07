@@ -24,7 +24,9 @@ const ICON_PATHS: Record<
   | 'box'
   | 'truck'
   | 'pin'
-  | 'home',
+  | 'home'
+  | 'user'
+  | 'phone',
   ReactNode
 > = {
   check: <path d="M20 6 9 17l-5-5" />,
@@ -113,6 +115,15 @@ const ICON_PATHS: Record<
       <path d="M3 11.5 12 4l9 7.5" />
       <path d="M5 10v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10" />
     </>
+  ),
+  user: (
+    <>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21c0-4 3.5-7 8-7s8 3 8 7" />
+    </>
+  ),
+  phone: (
+    <path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384" />
   ),
 };
 
@@ -278,6 +289,30 @@ export function TeamBadge({ id, name }: { id: string; name: string }) {
       <span className="text-[11px] font-medium text-zinc-700">
         {name.split(' ')[0]}
       </span>
+    </span>
+  );
+}
+
+/** Whoever the DONOR sent to hand off a delivery — a courier, not one of
+ *  ours. Deliberately outline/neutral, never the colored TeamAvatar circle,
+ *  so that signal stays reserved for our own team (see TeamAvatar above). */
+export function CourierBadge({ name, phone }: { name: string; phone?: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-white py-0.5 pl-0.5 pr-2 ring-1 ring-zinc-300">
+      <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-zinc-50 text-zinc-400 ring-1 ring-inset ring-zinc-200">
+        <Icon name="user" size={10} />
+      </span>
+      <span className="text-[11px] font-medium text-zinc-600">{name}</span>
+      <span className="eyebrow text-[9px] font-bold text-zinc-400">COURIER</span>
+      {phone && (
+        <a
+          href={`tel:${phone}`}
+          className="text-zinc-400 transition-colors hover:text-zinc-700"
+          aria-label={`Call ${name}`}
+        >
+          <Icon name="phone" size={11} />
+        </a>
+      )}
     </span>
   );
 }
