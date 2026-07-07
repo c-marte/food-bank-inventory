@@ -26,7 +26,7 @@ export function IntakePage() {
 
       <div className="flex flex-wrap items-center gap-2">
         <Button size="lg" onClick={openExpect}>
-          <Icon name="inbox" size={16} /> Expect a delivery
+          <Icon name="inbox" size={16} /> Record donation
         </Button>
         <Button size="lg" variant="ghost" onClick={openIntake}>
           <Icon name="plus" size={16} /> Walk-in

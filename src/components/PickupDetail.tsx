@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { Delivery, TeamMember } from '../domain/types';
 import { directionsUrl, locationForDonor } from '../data/geo';
-import { Button, Icon, TeamBadge } from '../ui/primitives';
+import { Button, Icon, TeamAvatar } from '../ui/primitives';
 import { QRCodeImage } from '../ui/QRCode';
 import { TrackerMapCanvas } from './TrackerMapCanvas';
+import { DirectionsSheet } from './DirectionsSheet';
 
 /* ─────────────────────────────────────────────────────────
  * PICKUP's bespoke right-hand detail: no stepper (this is awaiting OUR
@@ -23,6 +24,7 @@ export function PickupDetail({
 }) {
   const donorLoc = useMemo(() => locationForDonor(delivery.donorName), [delivery.donorName]);
   const url = useMemo(() => directionsUrl(donorLoc), [donorLoc]);
+  const [directionsOpen, setDirectionsOpen] = useState(false);
 
   return (
     <div className="flex h-full min-h-28 flex-col overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50">
@@ -32,7 +34,13 @@ export function PickupDetail({
         </div>
         <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-zinc-500">
           <span className="font-medium text-zinc-900">{delivery.donorName}</span>
-          {assignee && <TeamBadge id={assignee.id} name={assignee.name} />}
+          {assignee && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 py-0.5 pl-0.5 pr-2 ring-1 ring-sky-200">
+              <TeamAvatar id={assignee.id} name={assignee.name} size={18} />
+              <span className="text-[11px] font-medium text-sky-700">{assignee.name.split(' ')[0]}</span>
+              <span className="eyebrow text-[9px] font-bold text-sky-500">YOUR PICKUP</span>
+            </span>
+          )}
           {delivery.note && <span className="text-zinc-400">· {delivery.note}</span>}
         </p>
       </div>
@@ -42,16 +50,20 @@ export function PickupDetail({
       </div>
 
       <div className="flex items-center gap-3 border-t border-zinc-200 bg-white px-3 py-2.5">
-        <QRCodeImage value={url} size={52} />
+        <QRCodeImage value={url} size={72} />
         <div className="min-w-0 flex-1">
-          <a href={url} target="_blank" rel="noreferrer">
-            <Button className="w-full" size="sm">
-              <Icon name="pin" size={13} /> Get directions
-            </Button>
-          </a>
+          <Button className="w-full" size="lg" onClick={() => setDirectionsOpen(true)}>
+            <Icon name="pin" size={14} /> Send me directions
+          </Button>
           <p className="mt-1 truncate text-[10px] text-zinc-400">Scan to open on your phone</p>
         </div>
       </div>
+      <DirectionsSheet
+        open={directionsOpen}
+        onClose={() => setDirectionsOpen(false)}
+        donorName={delivery.donorName}
+        url={url}
+      />
     </div>
   );
 }

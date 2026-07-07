@@ -1,11 +1,12 @@
+import { useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import type { Delivery } from '../domain/types';
 import { daysUntil } from '../domain/dates';
 import { useStore } from '../store/useStore';
-import { useUI } from '../store/useUI';
-import { Button, Card, Icon, SectionHeader, TeamBadge, TierMark } from '../ui/primitives';
+import { Card, Icon, SectionHeader, TeamBadge, TierMark } from '../ui/primitives';
 import { cn } from '../ui/cn';
 import { SPRING } from '../ui/motion';
+import { TrackerMapCanvas } from './TrackerMapCanvas';
 
 const KIND_LABEL: Record<Delivery['kind'], string> = {
   recurring: 'Recurring',
@@ -19,7 +20,7 @@ const KIND_LABEL: Record<Delivery['kind'], string> = {
  *  received deliveries leave the list (they've become lots). */
 export function IncomingDeliveries() {
   const { deliveries, team, today } = useStore();
-  const { openExpect, openReceive } = useUI();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const expected = deliveries
     .filter((d) => d.status === 'expected')
@@ -29,66 +30,69 @@ export function IncomingDeliveries() {
 
   const incoming = expected.filter((d) => d.mode === 'they_come');
   const pickups = expected.filter((d) => d.mode === 'we_go');
+  const mapDelivery = expected.find((d) => d.id === selectedId) ?? expected[0];
 
   return (
     <Card className="p-4 sm:p-5">
-      <SectionHeader
-        right={
-          <button
-            onClick={openExpect}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500 hover:text-zinc-900"
-          >
-            <Icon name="plus" size={13} /> Expect another
-          </button>
-        }
-      >
+      <SectionHeader>
         <span className="inline-flex items-center gap-1.5">
           <Icon name="truck" size={14} className="text-zinc-400" /> Incoming
         </span>
       </SectionHeader>
+      <div className="mt-3 grid items-stretch gap-3 lg:grid-cols-2">
+        <div className="space-y-4">
+          {/* Two distinct lists — a delivery (they come) is not a pickup (we go). */}
+          {incoming.length > 0 && (
+            <>
+              <div className="eyebrow text-[10px] font-bold text-zinc-400">
+                Deliveries — {incoming.length}
+              </div>
+              <ul className="mt-1.5 space-y-2.5">
+                <AnimatePresence initial={false}>
+                  {incoming.map((d) => (
+                    <DeliveryRow
+                      key={d.id}
+                      delivery={d}
+                      daysAway={daysUntil(d.expectedDate, today)}
+                      assignee={team.find((t) => t.id === d.assigneeId)}
+                      selected={d.id === mapDelivery.id}
+                      onSelect={() => setSelectedId(d.id)}
+                    />
+                  ))}
+                </AnimatePresence>
+              </ul>
+            </>
+          )}
 
-      {/* Two distinct lists — a delivery (they come) is not a pickup (we go). */}
-      {incoming.length > 0 && (
-        <>
-          <div className="eyebrow mt-3 text-[10px] font-bold text-zinc-400">
-            Deliveries — {incoming.length}
-          </div>
-          <ul className="mt-1.5 space-y-2.5">
-            <AnimatePresence initial={false}>
-              {incoming.map((d) => (
-                <DeliveryRow
-                  key={d.id}
-                  delivery={d}
-                  daysAway={daysUntil(d.expectedDate, today)}
-                  assignee={team.find((t) => t.id === d.assigneeId)}
-                  onReceive={() => openReceive(d.id)}
-                />
-              ))}
-            </AnimatePresence>
-          </ul>
-        </>
-      )}
+          {pickups.length > 0 && (
+            <>
+              <div className={cn('eyebrow text-[10px] font-bold text-zinc-400', incoming.length > 0 && 'mt-4')}>
+                Our pickups — {pickups.length}
+              </div>
+              <ul className="mt-1.5 space-y-2.5">
+                <AnimatePresence initial={false}>
+                  {pickups.map((d) => (
+                    <DeliveryRow
+                      key={d.id}
+                      delivery={d}
+                      daysAway={daysUntil(d.expectedDate, today)}
+                      assignee={team.find((t) => t.id === d.assigneeId)}
+                      selected={d.id === mapDelivery.id}
+                      onSelect={() => setSelectedId(d.id)}
+                    />
+                  ))}
+                </AnimatePresence>
+              </ul>
+            </>
+          )}
+        </div>
 
-      {pickups.length > 0 && (
-        <>
-          <div className={cn('eyebrow text-[10px] font-bold text-zinc-400', incoming.length > 0 && 'mt-4')}>
-            Our pickups — {pickups.length}
+        {mapDelivery && (
+          <div className="min-h-[340px] overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50">
+            <TrackerMapCanvas delivery={mapDelivery} />
           </div>
-          <ul className="mt-1.5 space-y-2.5">
-            <AnimatePresence initial={false}>
-              {pickups.map((d) => (
-                <DeliveryRow
-                  key={d.id}
-                  delivery={d}
-                  daysAway={daysUntil(d.expectedDate, today)}
-                  assignee={team.find((t) => t.id === d.assigneeId)}
-                  onReceive={() => openReceive(d.id)}
-                />
-              ))}
-            </AnimatePresence>
-          </ul>
-        </>
-      )}
+        )}
+      </div>
     </Card>
   );
 }
@@ -97,12 +101,14 @@ function DeliveryRow({
   delivery,
   daysAway,
   assignee,
-  onReceive,
+  selected,
+  onSelect,
 }: {
   delivery: Delivery;
   daysAway: number;
   assignee?: { id: string; name: string };
-  onReceive: () => void;
+  selected: boolean;
+  onSelect: () => void;
 }) {
   const when =
     daysAway <= 0 ? 'Today' : daysAway === 1 ? 'Tomorrow' : `in ${daysAway} days`;
@@ -116,9 +122,19 @@ function DeliveryRow({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, height: 0, marginTop: 0 }}
       transition={SPRING.reflow}
-      className="rounded-lg border border-zinc-300 p-3"
+      className={cn(
+        'rounded-lg border p-3 transition-colors',
+        selected
+          ? 'border-zinc-950 bg-zinc-50'
+          : 'border-zinc-300 hover:border-zinc-400',
+      )}
     >
-      <div className="flex items-center justify-between gap-2">
+      <button
+        type="button"
+        onClick={onSelect}
+        className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950"
+      >
+      <div className="flex items-center gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <span className="truncate text-sm font-semibold text-zinc-950">
             {delivery.donorName}
@@ -139,9 +155,6 @@ function DeliveryRow({
           </span>
           {assignee && <TeamBadge id={assignee.id} name={assignee.name} />}
         </div>
-        <Button size="sm" onClick={onReceive}>
-          <Icon name="inbox" size={14} /> Receive
-        </Button>
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-zinc-600">
@@ -158,6 +171,7 @@ function DeliveryRow({
           {delivery.note} · ~{units} units expected
         </div>
       )}
+      </button>
     </motion.li>
   );
 }

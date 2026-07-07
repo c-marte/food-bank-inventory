@@ -1,3 +1,4 @@
+import { motion } from 'motion/react';
 import type { Delivery } from '../domain/types';
 import { getDeliveryStage } from '../domain/deliveries';
 import { daysUntil, parseLocalDate } from '../domain/dates';
@@ -5,6 +6,7 @@ import { Button, CourierBadge, Icon } from '../ui/primitives';
 import { ManifestDisclosure } from './FlowTileVisuals';
 import { TrackerMapCanvas } from './TrackerMapCanvas';
 import { cn } from '../ui/cn';
+import { SPRING } from '../ui/motion';
 
 function timingLabel(daysAway: number): string {
   if (daysAway <= 0) return 'today';
@@ -37,6 +39,8 @@ function fullDate(iso: string): string {
 function Stepper({ delivery, today }: { delivery: Delivery; today: string }) {
   const stage = getDeliveryStage(delivery, today);
   const currentIndex = STAGE_ORDER.findIndex((s) => s.key === stage);
+  const stageTone =
+    stage === 'received' ? 'bg-emerald-500' : stage === 'en_route' ? 'bg-sky-500' : 'bg-zinc-300';
 
   // Calendar-date captions only — this app has no clock times, by design.
   const caption = (() => {
@@ -52,10 +56,11 @@ function Stepper({ delivery, today }: { delivery: Delivery; today: string }) {
 
   return (
     <div className="border-b border-zinc-200 bg-white px-3 pb-2.5 pt-3">
+      <div className={cn('mb-2 h-1 rounded-full', stageTone)} />
       <div className="flex items-center">
         {STAGE_ORDER.map((s, i) => (
           <span key={s.key} className="flex flex-1 items-center last:flex-none">
-            <span
+            <motion.span
               className={cn(
                 'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold',
                 i < currentIndex
@@ -64,9 +69,17 @@ function Stepper({ delivery, today }: { delivery: Delivery; today: string }) {
                     ? 'bg-zinc-950 text-white'
                     : 'bg-zinc-200 text-zinc-400',
               )}
+              animate={
+                i === currentIndex
+                  ? {
+                      scale: [1, 1.08, 1],
+                    }
+                  : undefined
+              }
+              transition={i === currentIndex ? { ...SPRING.pop, duration: 1.2, repeat: Infinity } : undefined}
             >
               {i < currentIndex ? <Icon name="check" size={11} /> : i + 1}
-            </span>
+            </motion.span>
             {i < STAGE_ORDER.length - 1 && (
               <span
                 className={cn('h-0.5 flex-1', i < currentIndex ? 'bg-emerald-500' : 'bg-zinc-200')}
@@ -82,7 +95,10 @@ function Stepper({ delivery, today }: { delivery: Delivery; today: string }) {
           </span>
         ))}
       </div>
-      <div className="mt-1 text-xs text-zinc-500">{caption}</div>
+      <div className="mt-1 flex items-center gap-1 text-xs text-zinc-500">
+        <Icon name="clock" size={11} />
+        <span>{caption}</span>
+      </div>
     </div>
   );
 }
@@ -96,6 +112,7 @@ export function DeliveryDetail({
   today: string;
   onReceive: () => void;
 }) {
+  const stage = getDeliveryStage(delivery, today);
   return (
     <div className="flex h-full min-h-28 flex-col overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50">
       <Stepper delivery={delivery} today={today} />
@@ -110,7 +127,9 @@ export function DeliveryDetail({
           <span>
             expected{' '}
             <span className="font-medium text-zinc-700">
-              {delivery.note ?? timingLabel(daysUntil(delivery.expectedDate, today))}
+              <span className={cn(stage === 'en_route' && 'font-semibold text-zinc-900')}>
+                {delivery.note ?? timingLabel(daysUntil(delivery.expectedDate, today))}
+              </span>
             </span>
           </span>
         </p>
