@@ -153,6 +153,14 @@ export interface Delivery {
    *  are reserved for our own team, see ui/primitives.tsx `TeamAvatar`). */
   courierName?: string;
   courierPhone?: string;
+  /** they_come only: the donor's OWN stated arrival window, in their own
+   *  words from the phone call (e.g. "7:45 PM") — shown verbatim, never
+   *  parsed into a real clock value and never computed/tracked. This app has
+   *  no GPS, so any clock-time ETA has to come from a human, not a formula. */
+  estimatedWindow?: string;
+  /** they_come only: the donor's own stated outer bound ("by 8:15 PM at the
+   *  latest") — same rule as estimatedWindow: verbatim human input. */
+  latestWindow?: string;
 }
 
 /** A recorded discard: food physically pulled from the shelf and tossed.

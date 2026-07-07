@@ -17,6 +17,7 @@ import {
 import { useStore } from '../store/useStore';
 import { useUI } from '../store/useUI';
 import {
+  BetaPill,
   Button,
   Card,
   EmptyCard,
@@ -59,13 +60,25 @@ export function DistributionPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-zinc-950">
-          Distribution
-        </h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-medium tracking-tight text-zinc-950">
+            Outbound
+          </h1>
+          <BetaPill />
+        </div>
         <p className="mt-0.5 text-sm text-zinc-500">
           Food out is a pipeline: pack it, match it to a taker, hand it off.
           The shelf only decrements at the handoff.
         </p>
+      </div>
+
+      {/* Full-width pixel-art hero, matching Intake and Inventory's treatment. */}
+      <div className="overflow-hidden rounded-xl ring-1 ring-zinc-200">
+        <img
+          src="/distribution-hero.webp"
+          alt="Illustration of a set dinner table with a family meal"
+          className="h-32 w-full object-cover object-[center_38%] sm:h-44"
+        />
       </div>
 
       {/* The pipeline — one column per stage, movements as cards. */}
@@ -191,6 +204,7 @@ export function DistributionPage() {
               <div className="mt-3 border-t border-zinc-100 pt-3">
                 <Button
                   size="sm"
+                  variant="dark"
                   onClick={() =>
                     addMovement({ lines: box, packed: true, note: 'FEFO family box' })
                   }
@@ -353,7 +367,7 @@ function MovementCard({
       <div className="mt-2.5 border-t border-zinc-100 pt-2.5">
         {stage === 'pack' && (
           <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" onClick={() => patchMovement(m.id, { packed: true })}>
+            <Button size="sm" variant="dark" onClick={() => patchMovement(m.id, { packed: true })}>
               <Icon name="box" size={13} /> Mark packed
             </Button>
             <AssigneePicker
@@ -366,7 +380,7 @@ function MovementCard({
 
         {stage === 'match' &&
           (!matching ? (
-            <Button size="sm" onClick={() => setMatching(true)}>
+            <Button size="sm" variant="dark" onClick={() => setMatching(true)}>
               <Icon name="arrow" size={13} /> Choose recipient
             </Button>
           ) : (
@@ -403,7 +417,7 @@ function MovementCard({
 
         {stage === 'handoff' && (
           <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" onClick={() => completeHandoff(m.id)}>
+            <Button size="sm" variant="dark" onClick={() => completeHandoff(m.id)}>
               <Icon name="check" size={13} />
               {m.mode === 'we_go' ? 'Mark delivered' : 'Complete pickup'}
             </Button>

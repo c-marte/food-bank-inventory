@@ -1,17 +1,34 @@
 import { useMemo, useState } from 'react';
 import type { Category, Config, InventoryLot, ISODate } from '../domain/types';
-import { CATEGORIES, CATEGORY_LABELS } from '../domain/types';
+import { CATEGORY_LABELS } from '../domain/types';
 import { daysUntil } from '../domain/dates';
 import { getLotStatus } from '../domain/status';
+import {
+  FOOD_GROUPS,
+  FOOD_GROUP_ICON,
+  FOOD_GROUP_LABELS,
+  foodGroupFor,
+  type FoodGroup,
+} from '../domain/foodGroups';
 import { useStore } from '../store/useStore';
 import { useUI } from '../store/useUI';
-import { Card, Icon, SectionHeader, StatusBadge, TierMark } from '../ui/primitives';
+import { BetaPill, Card, Icon, SectionHeader, StatusBadge } from '../ui/primitives';
 import { STATUS_META, fullDateLabel, shortDayLabel } from '../ui/format';
 import { cn } from '../ui/cn';
+
+/* ─────────────────────────────────────────────────────────
+ * The three food groups (see domain/foodGroups.ts) drive this page's whole
+ * layout: Hot foods and Canned foods get their own section regardless of
+ * category; everything else (dairy, grains, protein, other, fresh produce)
+ * is lower-urgency and shares one "Groceries or produce" catch-all. The
+ * finer-grained category still shows per row (as an eyebrow tag) — this
+ * groups by urgency, it doesn't erase the category information.
+ * ───────────────────────────────────────────────────────── */
 
 interface LotGroup {
   name: string;
   category: Category;
+  foodGroup: FoodGroup;
   lots: InventoryLot[];
   totalInStock: number;
   urgency: number;
@@ -21,15 +38,13 @@ function buildGroups(
   lots: InventoryLot[],
   today: ISODate,
   config: Config,
-  filter: Category | 'all',
-  showEmpty: boolean,
+  filter: FoodGroup | 'all',
   expiredOnly: boolean,
 ): LotGroup[] {
-  let visible = filter === 'all' ? lots : lots.filter((l) => l.category === filter);
+  let visible = filter === 'all' ? lots : lots.filter((l) => foodGroupFor(l) === filter);
   if (expiredOnly) {
     visible = visible.filter((l) => getLotStatus(l, today, config) === 'expired');
   }
-  if (!showEmpty) visible = visible.filter((l) => l.quantity > 0);
 
   const byName = new Map<string, InventoryLot[]>();
   for (const lot of visible) {
@@ -51,7 +66,14 @@ function buildGroups(
     const urgency = actionable.length
       ? daysUntil(actionable[0].expiryDate, today)
       : Infinity;
-    return { name, category: sorted[0].category, lots: sorted, totalInStock, urgency };
+    return {
+      name,
+      category: sorted[0].category,
+      foodGroup: foodGroupFor(sorted[0]),
+      lots: sorted,
+      totalInStock,
+      urgency,
+    };
   });
 
   // Attention-worthy names float up; all-expired / empty groups sink.
@@ -62,105 +84,137 @@ function buildGroups(
 export function LotList() {
   const { lots, today, config } = useStore();
   const { openLot, expiredOnly, setExpiredOnly } = useUI();
-  const [filter, setFilter] = useState<Category | 'all'>('all');
-  const [showEmpty, setShowEmpty] = useState(true);
+  const [filter, setFilter] = useState<FoodGroup | 'all'>('all');
 
   const groups = useMemo(
-    () => buildGroups(lots, today, config, filter, showEmpty, expiredOnly),
-    [lots, today, config, filter, showEmpty, expiredOnly],
+    () => buildGroups(lots, today, config, filter, expiredOnly),
+    [lots, today, config, filter, expiredOnly],
   );
 
-  const totalLots = filter === 'all' ? lots.length : lots.filter((l) => l.category === filter).length;
+  const totalLots =
+    filter === 'all' ? lots.length : lots.filter((l) => foodGroupFor(l) === filter).length;
+
+  const visibleGroups = filter === 'all' ? FOOD_GROUPS : [filter];
 
   return (
-    <Card className="p-4 sm:p-5">
-      <SectionHeader
-        right={
+    <div className="space-y-4">
+      <div>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-medium tracking-tight text-zinc-950">Inventory</h1>
+          <BetaPill />
+        </div>
+        <p className="mt-0.5 text-sm text-zinc-500">
+          Every lot on the shelf, grouped by handling urgency. Same-name lots
+          from different donations are never merged — expiry dates differ.
+        </p>
+      </div>
+
+      {/* Full-width pixel-art hero, matching the Intake page's treatment. */}
+      <div className="overflow-hidden rounded-xl ring-1 ring-zinc-200">
+        <img
+          src="/inventory-hero.webp"
+          alt="Illustration of a stocked shelving unit with a ladder"
+          className="h-32 w-full object-cover object-[center_38%] sm:h-44"
+        />
+      </div>
+
+      <Card className="p-4 sm:p-5">
+        <SectionHeader>Full inventory</SectionHeader>
+
+        {/* Filters: status first (the triage "expired" path lands here), then
+            the three food groups. */}
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
           <button
-            onClick={() => setShowEmpty((v) => !v)}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500 hover:text-zinc-800"
+            onClick={() => setExpiredOnly(!expiredOnly)}
+            aria-pressed={expiredOnly}
+            className={cn(
+              'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950',
+              expiredOnly
+                ? 'border-red-600 bg-red-600 text-white'
+                : 'border-red-200 bg-white text-red-700 hover:border-red-400',
+            )}
           >
-            <span
-              className={cn(
-                'flex h-4 w-4 items-center justify-center rounded border',
-                showEmpty ? 'border-zinc-950 bg-zinc-950 text-white' : 'border-zinc-300',
-              )}
-            >
-              {showEmpty ? <Icon name="check" size={11} /> : null}
-            </span>
-            Show empty
+            <Icon name="x" size={12} /> Expired only
           </button>
-        }
-      >
-        Full inventory
-      </SectionHeader>
-
-      {/* Filters: status first (the triage "expired" path lands here), then category. */}
-      <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-        <button
-          onClick={() => setExpiredOnly(!expiredOnly)}
-          aria-pressed={expiredOnly}
-          className={cn(
-            'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950',
-            expiredOnly
-              ? 'border-red-600 bg-red-600 text-white'
-              : 'border-red-200 bg-white text-red-700 hover:border-red-400',
-          )}
-        >
-          <Icon name="x" size={12} /> Expired only
-        </button>
-        <span className="my-1 w-px shrink-0 bg-zinc-200" aria-hidden />
-        <FilterChip active={filter === 'all'} onClick={() => setFilter('all')}>
-          All
-        </FilterChip>
-        {CATEGORIES.map((c) => (
-          <FilterChip key={c} active={filter === c} onClick={() => setFilter(c)}>
-            {CATEGORY_LABELS[c]}
+          <span className="my-1 w-px shrink-0 bg-zinc-200" aria-hidden />
+          <FilterChip active={filter === 'all'} onClick={() => setFilter('all')}>
+            All
           </FilterChip>
-        ))}
-      </div>
+          {FOOD_GROUPS.map((g) => (
+            <FilterChip key={g} active={filter === g} onClick={() => setFilter(g)}>
+              {FOOD_GROUP_LABELS[g]}
+            </FilterChip>
+          ))}
+        </div>
 
-      <div className="mt-1 divide-y divide-zinc-100">
-        {groups.length === 0 ? (
-          <p className="py-6 text-sm text-zinc-500">No lots in this category.</p>
-        ) : (
-          groups.map((group) => (
-            <div key={group.name} className="py-2.5">
-              <div className="flex items-baseline justify-between gap-2">
-                <div className="flex min-w-0 items-baseline gap-2">
-                  <span className="truncate font-semibold text-zinc-950">
-                    {group.name}
+        <div className="mt-4 space-y-5">
+          {visibleGroups.map((g) => {
+            const groupItems = groups.filter((lg) => lg.foodGroup === g);
+            return (
+              <div key={g}>
+                <SectionHeader
+                  right={<span className="nums text-xs text-zinc-400">{groupItems.length}</span>}
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    {FOOD_GROUP_LABELS[g]}
+                    <Icon name={FOOD_GROUP_ICON[g]} size={14} className="text-zinc-500" />
                   </span>
-                  <span className="eyebrow text-[10px] text-zinc-400">
-                    {CATEGORY_LABELS[group.category]}
-                  </span>
+                </SectionHeader>
+
+                {/* Indented under the header — only the group headers stay
+                    left-aligned, so the three sections read as the page's
+                    real structure and everything else is clearly nested
+                    under one of them. */}
+                <div className="mt-2.5 divide-y divide-zinc-100 pl-4">
+                  {groupItems.length === 0 ? (
+                    <p className="py-3 text-sm text-zinc-500">Nothing in this group.</p>
+                  ) : (
+                    groupItems.map((group) => (
+                      <div key={group.name} className="py-2.5">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <div className="flex min-w-0 items-baseline gap-2">
+                            {/* Downgraded on purpose — the item name is the
+                                least urgent fact in this row; status/expiry
+                                (in each LotRow below) is what a shelf-keeper
+                                actually needs first. */}
+                            <span className="truncate text-xs font-medium text-zinc-500">
+                              {group.name}
+                            </span>
+                            <span className="eyebrow text-[10px] text-zinc-400">
+                              {CATEGORY_LABELS[group.category]}
+                            </span>
+                          </div>
+                          <span className="nums shrink-0 text-xs text-zinc-500">
+                            {group.totalInStock} in stock
+                            {group.lots.length > 1 ? ` · ${group.lots.length} lots` : ''}
+                          </span>
+                        </div>
+
+                        <ul className="mt-1.5 space-y-0.5">
+                          {group.lots.map((lot) => (
+                            <LotRow
+                              key={lot.id}
+                              lot={lot}
+                              today={today}
+                              config={config}
+                              onOpen={() => openLot(lot.id)}
+                            />
+                          ))}
+                        </ul>
+                      </div>
+                    ))
+                  )}
                 </div>
-                <span className="nums shrink-0 text-xs text-zinc-500">
-                  {group.totalInStock} in stock
-                  {group.lots.length > 1 ? ` · ${group.lots.length} lots` : ''}
-                </span>
               </div>
+            );
+          })}
+        </div>
 
-              <ul className="mt-1.5 space-y-0.5">
-                {group.lots.map((lot) => (
-                  <LotRow
-                    key={lot.id}
-                    lot={lot}
-                    today={today}
-                    config={config}
-                    onOpen={() => openLot(lot.id)}
-                  />
-                ))}
-              </ul>
-            </div>
-          ))
-        )}
-      </div>
-
-      <p className="mt-3 border-t border-zinc-100 pt-3 text-xs text-zinc-400">
-        {totalLots} lots · one row per donation — same-name lots are never merged.
-      </p>
-    </Card>
+        <p className="mt-3 border-t border-zinc-100 pt-3 text-xs text-zinc-400">
+          {totalLots} lots · one row per donation — same-name lots are never merged.
+        </p>
+      </Card>
+    </div>
   );
 }
 
@@ -219,7 +273,6 @@ function LotRow({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <StatusBadge status={status} />
-            <TierMark tier={lot.tier} size={13} />
             <span className="nums text-[13px] text-zinc-500">
               exp {fullDateLabel(lot.expiryDate)}
               <span className={cn('ml-1.5 font-semibold', STATUS_META[status].text)}>

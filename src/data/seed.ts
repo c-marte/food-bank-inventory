@@ -119,6 +119,8 @@ interface SeedDelivery {
   items: SeedDeliveryItem[];
   courierName?: string;
   courierPhone?: string;
+  estimatedWindow?: string;
+  latestWindow?: string;
 }
 
 // prettier-ignore
@@ -139,10 +141,32 @@ const SEED_DELIVERIES: SeedDelivery[] = [
     id: 'del-2', donorName: 'Stop & Shop', kind: 'recurring', when: 0,
     mode: 'they_come', assigneeId: 'team-3', note: 'usual morning drop',
     courierName: 'Ray', courierPhone: '+16175550142',
+    // Ray gave Jo a rough window on the phone — his own words, not a
+    // computed ETA. Shown verbatim in the delivery stepper.
+    estimatedWindow: '7:45 PM', latestWindow: '8:15 PM',
     items: [
       { name: 'Wheat Bread',      category: 'grains',  quantity: 12, unit: 'loaves',  expiry: 3, tier: 'fresh' },
       { name: 'Bananas',          category: 'produce', quantity: 15, unit: 'bunches', expiry: 4 },
       { name: 'Whole Milk',       category: 'dairy',   quantity: 6,  unit: 'gallons', expiry: 5 },
+    ],
+  },
+  {
+    // Day-old bakery pull, scheduled for tomorrow — Dan drives out.
+    id: 'del-3', donorName: 'Riverside Bakery', kind: 'recurring', when: 1,
+    mode: 'we_go', assigneeId: 'team-2', note: 'day-old bread — pick up by noon',
+    items: [
+      { name: 'Sourdough Loaves', category: 'grains',  quantity: 10, unit: 'loaves', expiry: 5 },
+      { name: 'Bagels',           category: 'grains',  quantity: 24, unit: 'bagels', expiry: 4 },
+    ],
+  },
+  {
+    // A community food drive's collection bins — scheduled a few days out.
+    id: 'del-4', donorName: 'Lincoln Elementary Drive', kind: 'drive', when: 3,
+    mode: 'we_go', assigneeId: 'team-3', note: 'collection bins in the front office',
+    items: [
+      { name: 'Canned Vegetables', category: 'canned',  quantity: 40, unit: 'cans', expiry: 300 },
+      { name: 'Canned Chili',      category: 'canned',  quantity: 30, unit: 'cans', expiry: 300 },
+      { name: 'Peanut Butter',     category: 'protein', quantity: 15, unit: 'jars', expiry: 250, tier: 'shelf_stable' },
     ],
   },
 ];
@@ -298,6 +322,8 @@ export function buildSeed(today: ISODate): SeedData {
     note: d.note,
     courierName: d.courierName,
     courierPhone: d.courierPhone,
+    estimatedWindow: d.estimatedWindow,
+    latestWindow: d.latestWindow,
     items: d.items.map((it, j) => ({
       id: `${d.id}-item-${j + 1}`,
       name: it.name,

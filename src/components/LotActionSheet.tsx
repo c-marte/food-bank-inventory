@@ -256,7 +256,7 @@ function VerbButton({
         disabled
           ? 'cursor-not-allowed border-zinc-200 opacity-45'
           : emphasis
-            ? 'border-zinc-950 bg-zinc-950 text-white hover:bg-zinc-800'
+            ? 'border-accent bg-accent text-white hover:bg-accent-hover'
             : danger
               ? 'border-red-300 bg-white hover:bg-red-50'
               : 'border-zinc-300 bg-white hover:bg-zinc-50',

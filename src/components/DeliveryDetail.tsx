@@ -1,33 +1,30 @@
 import { motion } from 'motion/react';
 import type { Delivery } from '../domain/types';
-import { getDeliveryStage } from '../domain/deliveries';
+import { getDeliveryStage, getDeliveryProgress } from '../domain/deliveries';
 import { daysUntil, parseLocalDate } from '../domain/dates';
 import { Button, CourierBadge, Icon } from '../ui/primitives';
 import { ManifestDisclosure } from './FlowTileVisuals';
-import { TrackerMapCanvas } from './TrackerMapCanvas';
 import { cn } from '../ui/cn';
 import { SPRING } from '../ui/motion';
 
-function timingLabel(daysAway: number): string {
-  if (daysAway <= 0) return 'today';
-  if (daysAway === 1) return 'tomorrow';
-  return `in ${daysAway} days`;
-}
-
 /* ─────────────────────────────────────────────────────────
- * DELIVERY's bespoke right-hand detail: the 3-stage stepper (Scheduled ->
- * En route -> Received, derived from expectedDate vs. today + status, never
- * stored), a human expected window, a manifest you can expand for a
- * cross-check, the donor's courier (if named — neutral avatar, never
- * TeamAvatar), and the Receive CTA. Pickup gets none of this — see
- * PickupDetail.tsx for its "Ready for pickup" + directions/QR template.
+ * DELIVERY's bespoke content for the floating detail panel: an Uber-Eats-
+ * style status header (a headline naming the real stage, an arrival window
+ * under it, a 5-segment progress bar, then a second window line below the
+ * bar), a manifest you can expand for a cross-check, the donor's courier (if
+ * named — neutral avatar, never TeamAvatar), and the Receive CTA. Pickup
+ * gets none of this — see PickupDetail.tsx. The map itself lives one level
+ * up (FoodInPanel/DonorDetailModal), as the backdrop this content sits under.
+ *
+ * The "Estimated arrival" / "Latest arrival" lines are NOT computed ETAs —
+ * this app has no GPS, so it can't track a real one. They render
+ * `estimatedWindow` / `latestWindow`, two fields the donor states verbatim
+ * on the phone call (see ExpectDeliverySheet). When a delivery doesn't have
+ * them, this falls back to the calendar-date + free-text `note` it always
+ * had — never a fabricated clock time.
  * ───────────────────────────────────────────────────────── */
 
-const STAGE_ORDER: { key: 'scheduled' | 'en_route' | 'received'; label: string }[] = [
-  { key: 'scheduled', label: 'Scheduled' },
-  { key: 'en_route', label: 'En route' },
-  { key: 'received', label: 'Received' },
-];
+const SEGMENTS = 5;
 
 function fullDate(iso: string): string {
   return parseLocalDate(iso).toLocaleDateString('en-US', {
@@ -36,69 +33,73 @@ function fullDate(iso: string): string {
   });
 }
 
-function Stepper({ delivery, today }: { delivery: Delivery; today: string }) {
-  const stage = getDeliveryStage(delivery, today);
-  const currentIndex = STAGE_ORDER.findIndex((s) => s.key === stage);
-  const stageTone =
-    stage === 'received' ? 'bg-emerald-500' : stage === 'en_route' ? 'bg-sky-500' : 'bg-zinc-300';
+function SegmentedBar({ progress, tone }: { progress: number; tone: string }) {
+  return (
+    <div className="mt-3 flex gap-1">
+      {Array.from({ length: SEGMENTS }).map((_, i) => {
+        const segStart = i / SEGMENTS;
+        const segEnd = (i + 1) / SEGMENTS;
+        const fillPct =
+          Math.max(0, Math.min(1, (progress - segStart) / (segEnd - segStart))) * 100;
+        return (
+          <div key={i} className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-200">
+            <motion.div
+              className={cn('h-full rounded-full', tone)}
+              initial={false}
+              animate={{ width: `${fillPct}%` }}
+              transition={SPRING.reflow}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
-  // Calendar-date captions only — this app has no clock times, by design.
-  const caption = (() => {
+function StatusHeader({ delivery, today }: { delivery: Delivery; today: string }) {
+  const stage = getDeliveryStage(delivery, today);
+  const progress = getDeliveryProgress(delivery, today);
+  const overdue = stage === 'en_route' && daysUntil(delivery.expectedDate, today) < 0;
+  const stageTone =
+    stage === 'received' ? 'bg-emerald-500' : stage === 'en_route' ? 'bg-sky-500' : 'bg-zinc-400';
+
+  const headline = (() => {
+    if (stage === 'received') return 'Received';
+    if (stage === 'en_route') return overdue ? 'Overdue' : 'Heading your way...';
+    return 'Scheduled';
+  })();
+
+  // The estimated window is the donor's own stated words, never a computed
+  // ETA — falls back to the calendar date when they didn't give one.
+  const subtext = (() => {
     if (stage === 'received' && delivery.receivedDate) {
-      return `Received ${fullDate(delivery.receivedDate)}`;
+      return `Logged ${fullDate(delivery.receivedDate)}`;
     }
-    const d = daysUntil(delivery.expectedDate, today);
-    if (stage === 'en_route') {
-      return d < 0 ? `Expected ${fullDate(delivery.expectedDate)} — overdue` : 'Expected today';
-    }
+    if (delivery.estimatedWindow) return `Estimated arrival ${delivery.estimatedWindow}`;
+    if (overdue) return `Was expected ${fullDate(delivery.expectedDate)}`;
     return `Expected ${fullDate(delivery.expectedDate)}`;
   })();
 
+  const latestLine = (() => {
+    if (stage === 'received') return null;
+    if (delivery.latestWindow) return `Latest arrival by ${delivery.latestWindow}`;
+    if (delivery.note) return `Donor's window: ${delivery.note}`;
+    return null;
+  })();
+
   return (
-    <div className="border-b border-zinc-200 bg-white px-3 pb-2.5 pt-3">
-      <div className={cn('mb-2 h-1 rounded-full', stageTone)} />
-      <div className="flex items-center">
-        {STAGE_ORDER.map((s, i) => (
-          <span key={s.key} className="flex flex-1 items-center last:flex-none">
-            <motion.span
-              className={cn(
-                'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold',
-                i < currentIndex
-                  ? 'bg-emerald-500 text-white'
-                  : i === currentIndex
-                    ? 'bg-zinc-950 text-white'
-                    : 'bg-zinc-200 text-zinc-400',
-              )}
-              animate={
-                i === currentIndex
-                  ? {
-                      scale: [1, 1.08, 1],
-                    }
-                  : undefined
-              }
-              transition={i === currentIndex ? { ...SPRING.pop, duration: 1.2, repeat: Infinity } : undefined}
-            >
-              {i < currentIndex ? <Icon name="check" size={11} /> : i + 1}
-            </motion.span>
-            {i < STAGE_ORDER.length - 1 && (
-              <span
-                className={cn('h-0.5 flex-1', i < currentIndex ? 'bg-emerald-500' : 'bg-zinc-200')}
-              />
-            )}
-          </span>
-        ))}
-      </div>
-      <div className="mt-1.5 flex items-center justify-between text-[10px] font-medium text-zinc-500">
-        {STAGE_ORDER.map((s, i) => (
-          <span key={s.key} className={cn(i === currentIndex && 'font-bold text-zinc-950')}>
-            {s.label}
-          </span>
-        ))}
-      </div>
-      <div className="mt-1 flex items-center gap-1 text-xs text-zinc-500">
-        <Icon name="clock" size={11} />
-        <span>{caption}</span>
-      </div>
+    <div className="px-3 pb-3 pt-3.5">
+      <h3 className="text-xl font-bold text-zinc-950">{headline}</h3>
+      <p className="mt-0.5 text-sm text-zinc-500">{subtext}</p>
+
+      <SegmentedBar progress={progress} tone={stageTone} />
+
+      {latestLine && (
+        <p className="mt-2.5 flex items-start gap-1.5 text-xs text-zinc-500">
+          <Icon name="clock" size={12} className="mt-0.5 shrink-0 text-zinc-400" />
+          <span>{latestLine}</span>
+        </p>
+      )}
     </div>
   );
 }
@@ -112,28 +113,11 @@ export function DeliveryDetail({
   today: string;
   onReceive: () => void;
 }) {
-  const stage = getDeliveryStage(delivery, today);
   return (
-    <div className="flex h-full min-h-28 flex-col overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50">
-      <Stepper delivery={delivery} today={today} />
+    <div className="flex flex-col">
+      <StatusHeader delivery={delivery} today={today} />
 
-      <div className="min-h-28 flex-1">
-        <TrackerMapCanvas delivery={delivery} />
-      </div>
-
-      <div className="space-y-2 border-t border-zinc-200 bg-white px-3 py-2.5">
-        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-zinc-600">
-          <span className="font-medium text-zinc-900">{delivery.donorName}</span>
-          <span>
-            expected{' '}
-            <span className="font-medium text-zinc-700">
-              <span className={cn(stage === 'en_route' && 'font-semibold text-zinc-900')}>
-                {delivery.note ?? timingLabel(daysUntil(delivery.expectedDate, today))}
-              </span>
-            </span>
-          </span>
-        </p>
-
+      <div className="space-y-2 border-t border-zinc-200 px-3 py-3">
         {delivery.courierName && (
           <CourierBadge name={delivery.courierName} phone={delivery.courierPhone} />
         )}

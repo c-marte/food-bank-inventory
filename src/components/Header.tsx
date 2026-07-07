@@ -3,10 +3,13 @@ import { useUI, type View } from '../store/useUI';
 import { Button, Icon } from '../ui/primitives';
 import { weekdayDateLabel } from '../ui/format';
 import { cn } from '../ui/cn';
+// Labels only — "Inbound"/"Outbound" mirror each other on purpose (food in,
+// food out). The underlying view ids ('intake'/'distribution') stay as-is;
+// this is a copy change, not a routing change.
 const MENU: { id: View; label: string; icon: 'inbox' | 'box' | 'arrow' }[] = [
-  { id: 'intake', label: 'Intake', icon: 'inbox' },
+  { id: 'intake', label: 'Inbound', icon: 'inbox' },
   { id: 'inventory', label: 'Inventory', icon: 'box' },
-  { id: 'distribution', label: 'Distribution', icon: 'arrow' },
+  { id: 'distribution', label: 'Outbound', icon: 'arrow' },
 ];
 
 export function Header() {
@@ -34,7 +37,7 @@ export function Header() {
                 )}
               >
                 <Icon name={item.icon} size={18} />
-                <span className="pointer-events-none absolute left-[calc(100%+8px)] top-1/2 -translate-y-1/2 rounded-xl bg-orange-600 px-3 py-1.5 text-sm font-medium text-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                <span className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 -translate-y-1/2 rounded-xl bg-zinc-800 px-3 py-1.5 text-sm font-medium text-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
                   {item.label}
                 </span>
               </button>
